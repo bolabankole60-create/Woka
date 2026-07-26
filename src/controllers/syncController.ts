@@ -159,7 +159,7 @@ async function processPushChangesInTransaction(
   const results: SyncResult[] = [];
 
   // Start transaction
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     for (const [collection, operations] of Object.entries(pushChanges)) {
       logger.debug(`[Sync] Processing ${operations.length} operations for ${collection}`);
 
@@ -245,7 +245,7 @@ async function handleUserOperation(
   baseResult: SyncResult
 ): Promise<SyncResult> {
   if (operation === 'create') {
-    const user = await tx.user.create({
+    await tx.user.create({
       data: {
         id,
         ...data,
@@ -335,7 +335,7 @@ async function handleJobOperation(
   baseResult: SyncResult
 ): Promise<SyncResult> {
   if (operation === 'create') {
-    const job = await tx.job.create({
+    await tx.job.create({
       data: {
         id,
         ...data,
@@ -407,7 +407,7 @@ async function handleInvoiceOperation(
   baseResult: SyncResult
 ): Promise<SyncResult> {
   if (operation === 'create') {
-    const invoice = await tx.invoice.create({
+    await tx.invoice.create({
       data: {
         id,
         ...data,

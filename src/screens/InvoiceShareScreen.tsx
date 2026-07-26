@@ -20,8 +20,6 @@ import {
   TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import * as Linking from 'expo-linking';
 
 // Type definitions for invoice data
@@ -31,17 +29,6 @@ interface InvoiceLineItem {
   category: 'material' | 'labor' | 'service';
   quantity: number;
   unitPrice: number;
-}
-
-interface InvoiceData {
-  jobId: string;
-  clientName: string;
-  clientPhone: string;
-  artisanName: string;
-  items: InvoiceLineItem[];
-  taxRate: number; // e.g., 0.075 for 7.5% VAT
-  discountRate: number; // e.g., 0.1 for 10% discount
-  notes?: string;
 }
 
 interface CalculatedTotals {
@@ -64,7 +51,6 @@ interface InvoiceShareScreenProps {
  * Main Invoice Share Screen Component
  */
 export const InvoiceShareScreen: React.FC<InvoiceShareScreenProps> = ({
-  route,
   jobData,
 }) => {
   const navigation = useNavigation();
@@ -318,19 +304,17 @@ ${clientName || 'Client Name'}
    */
   const saveInvoiceLocally = useCallback(async () => {
     try {
-      // In a real app, this would save to WatermelonDB
-      const invoiceData: InvoiceData = {
-        jobId: jobData?.jobId || `job_${Date.now()}`,
-        clientName,
-        clientPhone,
-        artisanName,
-        items,
-        taxRate,
-        discountRate,
-        notes,
-      };
-
       // TODO: Save to WatermelonDB with syncStatus: 'LOCAL'
+      // const invoiceData: InvoiceData = {
+      //   jobId: jobData?.jobId || `job_${Date.now()}`,
+      //   clientName,
+      //   clientPhone,
+      //   artisanName,
+      //   items,
+      //   taxRate,
+      //   discountRate,
+      //   notes,
+      // };
       // await invoiceDB.create(invoiceData);
 
       Alert.alert('Success', 'Invoice saved locally. It will sync when online.');

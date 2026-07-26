@@ -13,21 +13,20 @@
  * - operationQueue: Pending sync operations
  */
 
-import { Database, Model } from '@nozbe/watermelondb';
+import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
-import { Schema } from '@nozbe/watermelondb';
+import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 /**
  * Define database schema
  * This mirrors the Prisma schema for consistency
  */
-export const dbSchema = new Schema({
+export const dbSchema = appSchema({
   version: 4, // Increment when schema changes
   tables: [
     // Users Table
-    {
+    tableSchema({
       name: 'users',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'role', type: 'string' }, // 'artisan' | 'client' | 'admin'
@@ -49,22 +48,21 @@ export const dbSchema = new Schema({
         { name: 'city', type: 'string' },
         { name: 'address', type: 'string', isOptional: true },
         { name: 'whatsapp_number', type: 'string', isOptional: true },
-        { name: 'email_verified', type: 'boolean', default: false },
-        { name: 'phone_verified', type: 'boolean', default: false },
+        { name: 'email_verified', type: 'boolean' },
+        { name: 'phone_verified', type: 'boolean' },
         // Sync tracking
-        { name: 'sync_status', type: 'string', default: 'local' }, // 'local' | 'syncing' | 'synced' | 'conflict' | 'failed'
-        { name: 'client_version', type: 'number', default: 0 },
-        { name: 'server_version', type: 'number', default: 0 },
+        { name: 'sync_status', type: 'string' }, // 'local' | 'syncing' | 'synced' | 'conflict' | 'failed'
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
         { name: 'last_synced_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
-    },
+    }),
 
     // Jobs Table
-    {
+    tableSchema({
       name: 'jobs',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'artisan_id', type: 'string', isIndexed: true },
@@ -76,13 +74,13 @@ export const dbSchema = new Schema({
         { name: 'status', type: 'string', isIndexed: true }, // Job status enum
         { name: 'priority', type: 'string', isOptional: true },
         { name: 'estimated_cost', type: 'number', isOptional: true },
-        { name: 'material_cost', type: 'number', default: 0 },
-        { name: 'labor_fee', type: 'number', default: 0 },
-        { name: 'tax_amount', type: 'number', default: 0 },
-        { name: 'discount_amount', type: 'number', default: 0 },
-        { name: 'total_amount', type: 'number', default: 0 },
-        { name: 'paid_amount', type: 'number', default: 0 },
-        { name: 'pending_amount', type: 'number', default: 0 },
+        { name: 'material_cost', type: 'number' },
+        { name: 'labor_fee', type: 'number' },
+        { name: 'tax_amount', type: 'number' },
+        { name: 'discount_amount', type: 'number' },
+        { name: 'total_amount', type: 'number' },
+        { name: 'paid_amount', type: 'number' },
+        { name: 'pending_amount', type: 'number' },
         { name: 'notes', type: 'string', isOptional: true },
         { name: 'client_notes', type: 'string', isOptional: true },
         { name: 'artisan_notes', type: 'string', isOptional: true },
@@ -92,52 +90,50 @@ export const dbSchema = new Schema({
         { name: 'completed_at', type: 'number', isOptional: true },
         { name: 'due_date', type: 'number', isOptional: true },
         // Sync tracking
-        { name: 'sync_status', type: 'string', default: 'local' },
-        { name: 'client_version', type: 'number', default: 0 },
-        { name: 'server_version', type: 'number', default: 0 },
+        { name: 'sync_status', type: 'string' },
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
         { name: 'last_synced_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
-    },
+    }),
 
     // Invoices Table
-    {
+    tableSchema({
       name: 'invoices',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'job_id', type: 'string', isIndexed: true },
         { name: 'artisan_id', type: 'string', isIndexed: true },
         { name: 'invoice_number', type: 'string', isIndexed: true },
-        { name: 'subtotal', type: 'number', default: 0 },
-        { name: 'tax_rate', type: 'number', default: 0.075 },
-        { name: 'tax_amount', type: 'number', default: 0 },
-        { name: 'discount_amount', type: 'number', default: 0 },
-        { name: 'total_amount', type: 'number', default: 0 },
-        { name: 'amount_paid', type: 'number', default: 0 },
-        { name: 'amount_due', type: 'number', default: 0 },
-        { name: 'status', type: 'string', default: 'draft' },
-        { name: 'paid_status', type: 'string', default: 'unpaid' },
+        { name: 'subtotal', type: 'number' },
+        { name: 'tax_rate', type: 'number' },
+        { name: 'tax_amount', type: 'number' },
+        { name: 'discount_amount', type: 'number' },
+        { name: 'total_amount', type: 'number' },
+        { name: 'amount_paid', type: 'number' },
+        { name: 'amount_due', type: 'number' },
+        { name: 'status', type: 'string' },
+        { name: 'paid_status', type: 'string' },
         { name: 'notes', type: 'string', isOptional: true },
         { name: 'payment_terms', type: 'string', isOptional: true },
         { name: 'issued_at', type: 'number' },
         { name: 'due_date', type: 'number', isOptional: true },
         { name: 'paid_at', type: 'number', isOptional: true },
         // Sync tracking
-        { name: 'sync_status', type: 'string', default: 'local' },
-        { name: 'client_version', type: 'number', default: 0 },
-        { name: 'server_version', type: 'number', default: 0 },
+        { name: 'sync_status', type: 'string' },
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
         { name: 'last_synced_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
-    },
+    }),
 
     // Invoice Items Table
-    {
+    tableSchema({
       name: 'invoice_items',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'invoice_id', type: 'string', isIndexed: true },
@@ -148,12 +144,11 @@ export const dbSchema = new Schema({
         { name: 'category', type: 'string' }, // 'material' | 'labor' | 'service'
         { name: 'created_at', type: 'number' },
       ],
-    },
+    }),
 
     // Payments Table
-    {
+    tableSchema({
       name: 'payments',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'invoice_id', type: 'string', isIndexed: true, isOptional: true },
@@ -161,7 +156,7 @@ export const dbSchema = new Schema({
         { name: 'artisan_id', type: 'string', isIndexed: true },
         { name: 'amount', type: 'number' },
         { name: 'method', type: 'string' }, // 'cash' | 'bank_transfer' | 'paystack_escrow'
-        { name: 'status', type: 'string', default: 'pending' },
+        { name: 'status', type: 'string' },
         { name: 'transaction_id', type: 'string', isOptional: true },
         { name: 'receipt_number', type: 'string', isOptional: true },
         { name: 'paystack_transfer_id', type: 'string', isOptional: true },
@@ -170,19 +165,18 @@ export const dbSchema = new Schema({
         { name: 'paid_at', type: 'number', isOptional: true },
         { name: 'recorded_at', type: 'number' },
         // Sync tracking
-        { name: 'sync_status', type: 'string', default: 'local' },
-        { name: 'client_version', type: 'number', default: 0 },
-        { name: 'server_version', type: 'number', default: 0 },
+        { name: 'sync_status', type: 'string' },
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
         { name: 'last_synced_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
-    },
+    }),
 
     // Expense Log Table
-    {
+    tableSchema({
       name: 'expense_logs',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'artisan_id', type: 'string', isIndexed: true },
@@ -195,19 +189,18 @@ export const dbSchema = new Schema({
         { name: 'notes', type: 'string', isOptional: true },
         { name: 'receipt', type: 'string', isOptional: true },
         // Sync tracking
-        { name: 'sync_status', type: 'string', default: 'local' },
-        { name: 'client_version', type: 'number', default: 0 },
-        { name: 'server_version', type: 'number', default: 0 },
+        { name: 'sync_status', type: 'string' },
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
         { name: 'last_synced_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
-    },
+    }),
 
     // Operation Queue Table (for pending offline operations)
-    {
+    tableSchema({
       name: 'operation_queue',
-      primaryKey: 'id',
       columns: [
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'entity_type', type: 'string', isIndexed: true },
@@ -215,16 +208,16 @@ export const dbSchema = new Schema({
         { name: 'operation', type: 'string' }, // 'create' | 'update' | 'delete'
         { name: 'changes', type: 'string' }, // Serialized JSON
         { name: 'client_version', type: 'number' },
-        { name: 'retry_count', type: 'number', default: 0 },
-        { name: 'max_retries', type: 'number', default: 5 },
+        { name: 'retry_count', type: 'number' },
+        { name: 'max_retries', type: 'number' },
         { name: 'last_retry_at', type: 'number', isOptional: true },
         { name: 'last_error', type: 'string', isOptional: true },
-        { name: 'status', type: 'string', default: 'local' },
+        { name: 'status', type: 'string' },
         { name: 'created_at', type: 'number' },
         { name: 'enqueued_at', type: 'number' },
         { name: 'processed_at', type: 'number', isOptional: true },
       ],
-    },
+    }),
   ],
 });
 
@@ -239,7 +232,7 @@ export async function initializeDatabase(): Promise<Database> {
 
   const database = new Database({
     adapter,
-    actionsEnabled: true, // Enable batch operations
+    modelClasses: [],
   });
 
   // Run migrations if needed
@@ -319,15 +312,15 @@ export const dbHelpers = {
    */
   async getArtisanJobs(
     db: Database,
-    artisanId: string,
-    status?: string,
+    _artisanId: string,
+    _status?: string,
     limit: number = 50,
     offset: number = 0
   ): Promise<any[]> {
     const collection = db.get('jobs');
     let query = collection.query();
-    // Add filtering: artisan_id = artisanId and optionally status
-    // WatermelonDB Q syntax would be used here
+    // TODO: Add filtering: artisan_id = _artisanId and optionally _status
+    // using WatermelonDB Q syntax
     const records = await query.fetch();
     return records.slice(offset, offset + limit);
   },

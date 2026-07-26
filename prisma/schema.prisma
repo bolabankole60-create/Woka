@@ -372,8 +372,8 @@ model SyncLog {
   operation             String   // "push", "pull", "conflict_resolved"
 
   // Change details
-  entityType            String   // "job", "invoice", "payment", etc.
-  entityId              String
+  entityType            String?  // "job", "invoice", "payment", etc.
+  entityId              String?
   clientVersion         Int?
   serverVersion         Int?
 

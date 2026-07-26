@@ -9,13 +9,6 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-interface TabScreenOptions {
-  title: string;
-  headerShown: boolean;
-  tabBarLabel: string;
-  tabBarIcon: (props: { color: string; size: number }) => React.ReactNode;
-}
-
 /**
  * Tab Navigation with three main sections
  */
@@ -49,9 +42,6 @@ export const TabsLayout: React.FC = () => {
           fontSize: 11,
           fontWeight: '500',
           marginTop: 4,
-        },
-        sceneStyle: {
-          backgroundColor: '#f5f5f5',
         },
       }}
     >

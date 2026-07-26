@@ -17,7 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 
 // Services
-import { apiClient, initializeAPI } from '@/services/api';
+import { initializeAPI } from '@/services/api';
 
 // Types
 interface RootLayoutProps {}
@@ -125,7 +125,7 @@ export const RootLayout: React.FC<RootLayoutProps> = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <StatusBar style="dark" />
         <Slot />
       </SafeAreaProvider>
     </QueryClientProvider>

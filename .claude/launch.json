@@ -11,7 +11,7 @@
     {
       "name": "expo-start",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start"],
+      "runtimeArgs": ["expo", "start", "--clear"],
       "port": 19000
     }
   ]

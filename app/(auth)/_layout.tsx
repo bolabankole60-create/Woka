@@ -13,8 +13,6 @@ export const AuthLayout: React.FC = () => {
     <Stack
       screenOptions={{
         headerShown: false,
-        animationEnabled: true,
-        cardStyle: { backgroundColor: '#ffffff' },
       }}
     >
       {/* Login screen (first screen) */}

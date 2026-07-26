@@ -25,24 +25,15 @@ export function getPrismaClient(): PrismaClient {
     return prismaInstance;
   }
 
-  prismaInstance = new PrismaClient({
-    log: [
-      { level: 'error', emit: 'stdout' },
-      { level: 'warn', emit: 'stdout' },
-      ...(process.env.NODE_ENV === 'development'
-        ? [{ level: 'query', emit: 'event' }]
-        : []),
-    ],
-  });
-
-  // Log queries in development
+  // Configure logging based on environment
+  const logConfig: Array<'error' | 'warn' | 'info'> = ['error', 'warn'];
   if (process.env.NODE_ENV === 'development') {
-    prismaInstance.$on('query', (e) => {
-      logger.debug(`[DB Query] ${e.query}`, {
-        duration: `${e.duration}ms`,
-      });
-    });
+    logConfig.push('info');
   }
+
+  prismaInstance = new PrismaClient({
+    log: logConfig,
+  });
 
   return prismaInstance;
 }

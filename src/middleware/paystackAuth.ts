@@ -33,6 +33,17 @@ export interface PaystackRequest extends Request {
   signature: string; // Original signature from header
 }
 
+// Declare request property for Express type merging
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: string;
+      payloadVerified?: boolean;
+      signature?: string;
+    }
+  }
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -78,7 +89,7 @@ const ALLOWED_EVENTS = [
  * app.post('/api/v1/webhooks/paystack', verifyPaystackSignature, webhookHandler);
  */
 export function verifyPaystackSignature(
-  req: PaystackRequest,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {
@@ -209,7 +220,7 @@ function timingSafeEqual(a: string, b: string): boolean {
  * whitelist the events we care about.
  */
 export function validatePaystackEvent(
-  req: PaystackRequest,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {

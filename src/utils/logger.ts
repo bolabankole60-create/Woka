@@ -7,13 +7,6 @@
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogEntry {
-  level: LogLevel;
-  message: string;
-  timestamp: string;
-  data?: any;
-}
-
 class Logger {
   private logLevel: LogLevel = 'info';
 

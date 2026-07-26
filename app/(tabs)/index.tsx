@@ -8,20 +8,19 @@
  * - Recent jobs/activity
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDashboardData } from '@/src/hooks/useDashboardData';
-import { formatCurrency } from '@/src/utils/formatting';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { formatCurrency } from '@/utils/formatting';
 
 // Types
 interface SummaryData {
@@ -222,7 +221,10 @@ export const DashboardScreen: React.FC = () => {
               <TouchableOpacity
                 key={job.id}
                 activeOpacity={0.7}
-                onPress={() => router.push(`/(tabs)/jobs/${job.id}`)}
+                onPress={() => router.push({
+                  pathname: '/(tabs)/jobs/[id]',
+                  params: { id: job.id },
+                })}
                 style={{
                   backgroundColor: '#fff',
                   borderRadius: 8,

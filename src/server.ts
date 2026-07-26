@@ -18,7 +18,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 // Database & Config
-import { prisma, connectDatabase, disconnectDatabase, seedDatabase } from './config/database';
+import { connectDatabase, disconnectDatabase, seedDatabase } from './config/database';
 import { logger } from './utils/logger';
 
 // Routes
@@ -82,7 +82,7 @@ app.use(compression());
  * This middleware captures the raw request body as a string and attaches it
  * to the request object for later HMAC verification by Paystack auth middleware.
  */
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   let rawBody = '';
 
   req.on('data', (chunk: Buffer) => {
@@ -131,7 +131,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
  * Health Check Endpoint
  * Used for monitoring and load balancers
  */
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -148,12 +148,12 @@ setupRoutes(app);
 /**
  * 404 Handler
  */
-app.use((req: Request, res: Response) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Route not found',
-    path: req.path,
-    method: req.method,
+    path: _req.path,
+    method: _req.method,
   });
 });
 

@@ -57,20 +57,9 @@
         {
           "faceIDPermission": "Allow Tradify to use Face ID to secure your data."
         }
-      ],
-      [
-        "expo-file-system",
-        {
-          "photosPermission": "Allow Tradify to access your photos."
-        }
-      ],
-      [
-        "expo-sharing",
-        {}
       ]
     ],
     "experiments": {
-      "tsTester": true,
       "typedRoutes": true
     },
     "scheme": "tradify"

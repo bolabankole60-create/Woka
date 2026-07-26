@@ -53,16 +53,37 @@ interface ChargeSuccessPayload {
 }
 
 /**
- * Paystack Transfer Event
+ * Paystack Charge Failed Event
  */
-interface TransferEventPayload {
-  event: 'transfer.success' | 'transfer.failed' | 'transfer.reversed';
+interface ChargeFailedPayload {
+  event: 'charge.failed';
   data: {
-    reference: string; // Unique transfer reference
-    amount: number; // Amount in kobo
-    status: 'success' | 'failed' | 'reversed';
+    id: number;
+    reference: string;
+    amount: number;
+    currency: string;
+    status: 'failed';
+    gateway_response: string; // Reason for failure
+    customer: {
+      id: number;
+      email: string;
+      customer_code: string;
+    };
+    metadata?: Record<string, unknown>;
+    created_at: string;
+  };
+}
+
+/**
+ * Paystack Transfer Success Event
+ */
+interface TransferSuccessPayload {
+  event: 'transfer.success';
+  data: {
+    reference: string;
+    amount: number;
+    status: 'success';
     transfer_code?: string;
-    reason?: string; // Reason for failure/reversal
     metadata?: {
       paymentId?: string;
       artisanId?: string;
@@ -76,7 +97,52 @@ interface TransferEventPayload {
   };
 }
 
-type PaystackEvent = ChargeSuccessPayload | TransferEventPayload | { event: string };
+/**
+ * Paystack Transfer Failure/Reversal Event
+ */
+interface TransferFailurePayload {
+  event: 'transfer.failed' | 'transfer.reversed';
+  data: {
+    reference: string;
+    amount: number;
+    status: 'failed' | 'reversed';
+    transfer_code?: string;
+    reason?: string;
+    metadata?: {
+      paymentId?: string;
+      artisanId?: string;
+    };
+    recipient: {
+      id: number;
+      name: string;
+      bank_name?: string;
+      account_number?: string;
+    };
+  };
+}
+
+/**
+ * Union of all supported Paystack events
+ */
+type SupportedPaystackEvent =
+  | ChargeSuccessPayload
+  | ChargeFailedPayload
+  | TransferSuccessPayload
+  | TransferFailurePayload;
+
+/**
+ * All Paystack events, including unsupported ones
+ */
+type PaystackEvent = SupportedPaystackEvent | { event: string };
+
+/**
+ * Type guard to check if payload has data field
+ */
+function hasData(
+  payload: PaystackEvent
+): payload is SupportedPaystackEvent {
+  return 'data' in payload;
+}
 
 // ============================================================================
 // WEBHOOK HANDLER
@@ -95,18 +161,17 @@ export const handlePaystackWebhook = asyncHandler(
     const payload = req.body as PaystackEvent;
 
     // 1. Log receipt
-    logger.info(`[Paystack] Received event: ${payload.event}`, {
-      reference: (payload.data as any)?.reference,
-    });
+    const logData: Record<string, unknown> = { event: payload.event };
+    if (hasData(payload)) {
+      logData.reference = payload.data.reference;
+    }
+    logger.info(`[Paystack] Received event: ${payload.event}`, logData);
 
     // 2. Check idempotency (prevent duplicate processing)
     const isProcessed = await checkIdempotency(payload);
 
     if (isProcessed) {
-      logger.info(`[Paystack] Webhook already processed (idempotent)`, {
-        event: payload.event,
-        reference: (payload.data as any)?.reference,
-      });
+      logger.info(`[Paystack] Webhook already processed (idempotent)`, logData);
 
       // Return 200 OK (webhook marked as delivered)
       res.status(200).json({
@@ -119,20 +184,28 @@ export const handlePaystackWebhook = asyncHandler(
     // 3. Route to event handler
     switch (payload.event) {
       case 'charge.success':
-        await handleChargeSuccess(payload as ChargeSuccessPayload);
+        if (hasData(payload) && payload.event === 'charge.success') {
+          await handleChargeSuccess(payload);
+        }
         break;
 
       case 'charge.failed':
-        await handleChargeFailed(payload);
+        if (hasData(payload) && payload.event === 'charge.failed') {
+          await handleChargeFailed(payload);
+        }
         break;
 
       case 'transfer.success':
-        await handleTransferSuccess(payload as TransferEventPayload);
+        if (hasData(payload) && payload.event === 'transfer.success') {
+          await handleTransferSuccess(payload);
+        }
         break;
 
       case 'transfer.failed':
       case 'transfer.reversed':
-        await handleTransferFailure(payload as TransferEventPayload);
+        if (hasData(payload) && (payload.event === 'transfer.failed' || payload.event === 'transfer.reversed')) {
+          await handleTransferFailure(payload);
+        }
         break;
 
       default:
@@ -164,7 +237,9 @@ export const handlePaystackWebhook = asyncHandler(
  * 3. Update invoice status
  * 4. Increment server_version for mobile sync
  */
-async function handleChargeSuccess(payload: ChargeSuccessPayload): Promise<void> {
+async function handleChargeSuccess(
+  payload: ChargeSuccessPayload & { event: 'charge.success' }
+): Promise<void> {
   try {
     const { data } = payload;
     const { reference, amount, metadata } = data;
@@ -191,7 +266,7 @@ async function handleChargeSuccess(payload: ChargeSuccessPayload): Promise<void>
     });
 
     // Use transaction for consistency
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // 1. Find invoice
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
@@ -235,7 +310,7 @@ async function handleChargeSuccess(payload: ChargeSuccessPayload): Promise<void>
         newStatus = 'accepted'; // At least partially paid
       }
 
-      const updatedInvoice = await tx.invoice.update({
+      await tx.invoice.update({
         where: { id: invoiceId },
         data: {
           amountPaid: newAmountPaid,
@@ -291,7 +366,7 @@ async function handleChargeSuccess(payload: ChargeSuccessPayload): Promise<void>
  *
  * Customer payment failed. Update payment record and log event.
  */
-async function handleChargeFailed(payload: any): Promise<void> {
+async function handleChargeFailed(payload: ChargeFailedPayload): Promise<void> {
   try {
     const { data } = payload;
     const { reference } = data;
@@ -316,7 +391,9 @@ async function handleChargeFailed(payload: any): Promise<void> {
  * 2. Update status to COMPLETED
  * 3. Mark payment as transferred
  */
-async function handleTransferSuccess(payload: TransferEventPayload): Promise<void> {
+async function handleTransferSuccess(
+  payload: TransferSuccessPayload & { event: 'transfer.success' }
+): Promise<void> {
   try {
     const { data } = payload;
     const { reference, amount } = data;
@@ -356,7 +433,12 @@ async function handleTransferSuccess(payload: TransferEventPayload): Promise<voi
  * 2. Revert invoice paid amount if needed
  * 3. Notify artisan
  */
-async function handleTransferFailure(payload: TransferEventPayload): Promise<void> {
+async function handleTransferFailure(
+  payload: TransferFailurePayload & (
+    | { event: 'transfer.failed' }
+    | { event: 'transfer.reversed' }
+  )
+): Promise<void> {
   try {
     const { data } = payload;
     const { reference, status, reason } = data;
@@ -368,7 +450,7 @@ async function handleTransferFailure(payload: TransferEventPayload): Promise<voi
     });
 
     // Map Paystack status to payment status
-    const paymentStatus = status === 'reversed' ? 'REFUNDED' : 'FAILED';
+    const paymentStatus: 'REFUNDED' | 'FAILED' = status === 'reversed' ? 'REFUNDED' : 'FAILED';
 
     // Update payment record
     const payment = await prisma.payment.findFirst({
@@ -376,12 +458,12 @@ async function handleTransferFailure(payload: TransferEventPayload): Promise<voi
     });
 
     if (payment && payment.invoiceId) {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         // 1. Update payment
         await tx.payment.update({
           where: { id: payment.id },
           data: {
-            status: paymentStatus as any,
+            status: paymentStatus,
             notes: `Transfer ${status}: ${reason}`,
             serverVersion: payment.serverVersion + 1,
             updatedAt: new Date(),
@@ -433,7 +515,11 @@ async function handleTransferFailure(payload: TransferEventPayload): Promise<voi
  */
 async function checkIdempotency(payload: PaystackEvent): Promise<boolean> {
   try {
-    const reference = (payload.data as any)?.reference;
+    if (!hasData(payload)) {
+      return false; // No data field, allow processing
+    }
+
+    const reference = payload.data.reference;
 
     if (!reference) {
       return false; // No reference, allow processing
@@ -458,7 +544,11 @@ async function checkIdempotency(payload: PaystackEvent): Promise<boolean> {
  */
 async function recordProcessedWebhook(payload: PaystackEvent): Promise<void> {
   try {
-    const reference = (payload.data as any)?.reference;
+    if (!hasData(payload)) {
+      return; // No data field to record
+    }
+
+    const reference = payload.data.reference;
 
     if (!reference) {
       return; // No reference to record

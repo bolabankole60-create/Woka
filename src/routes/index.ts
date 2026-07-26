@@ -64,7 +64,7 @@ export function setupRoutes(app: Application): void {
     '/api/v1/webhooks/paystack',
     verifyPaystackSignature,
     validatePaystackEvent,
-    asyncHandler(handlePaystackWebhook),
+    handlePaystackWebhook,
   );
 
   // ============================================================================

@@ -47,7 +47,7 @@ export const ExpensesScreen: React.FC = () => {
     { id: 'tools', label: 'Tools', icon: 'hammer', color: '#9c27b0' },
     { id: 'equipment', label: 'Equipment', icon: 'cog', color: '#673ab7' },
     { id: 'other', label: 'Other', icon: 'package', color: '#9e9e9e' },
-  ];
+  ] as const;
 
   /**
    * Load expenses data

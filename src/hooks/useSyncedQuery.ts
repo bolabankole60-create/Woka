@@ -39,8 +39,6 @@ export function useSyncedQuery<TData = unknown>(
 
   // Monitor network connectivity
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-
     const startMonitoring = async () => {
       try {
         const netInfo = await Network.getNetworkStateAsync();
@@ -55,11 +53,9 @@ export function useSyncedQuery<TData = unknown>(
 
     startMonitoring();
 
-    // Cleanup
+    // Cleanup: currently no listeners to unsubscribe from
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      // TODO: Add network state listener when expo-network supports it
     };
   }, []);
 

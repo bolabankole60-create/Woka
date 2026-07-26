@@ -13,7 +13,7 @@
  * - PAYSTACK_PUBLIC_KEY: Paystack integration
  */
 
-import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 interface SyncOperation {
@@ -122,12 +122,24 @@ class APIClient {
   }
 
   /**
-   * Clear tokens (logout)
+   * Save authenticated user ID to secure storage
+   */
+  async saveUserData(userId: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync('userId', userId);
+    } catch (error) {
+      console.error('Failed to save user data:', error);
+    }
+  }
+
+  /**
+   * Clear tokens and user data (logout)
    */
   async clearTokens(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
+      await SecureStore.deleteItemAsync('userId');
       this.accessToken = null;
       this.refreshToken = null;
     } catch (error) {
@@ -174,6 +186,9 @@ class APIClient {
 
       const { accessToken, refreshToken, user } = response.data;
       await this.saveTokens(accessToken, refreshToken);
+      if (user?.id) {
+        await this.saveUserData(user.id);
+      }
       return user;
     } catch (error) {
       throw this.handleError(error);
@@ -198,6 +213,9 @@ class APIClient {
       const response = await this.client.post('/api/auth/signup', userData);
       const { accessToken, refreshToken, user } = response.data;
       await this.saveTokens(accessToken, refreshToken);
+      if (user?.id) {
+        await this.saveUserData(user.id);
+      }
       return user;
     } catch (error) {
       throw this.handleError(error);

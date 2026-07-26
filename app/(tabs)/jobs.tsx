@@ -186,7 +186,10 @@ export const JobsScreen: React.FC = () => {
               <TouchableOpacity
                 key={job.id}
                 activeOpacity={0.7}
-                onPress={() => router.push(`/(tabs)/jobs/${job.id}`)}
+                onPress={() => router.push({
+                  pathname: '/(tabs)/jobs/[id]',
+                  params: { id: job.id },
+                })}
                 style={{
                   backgroundColor: '#fff',
                   borderRadius: 12,
