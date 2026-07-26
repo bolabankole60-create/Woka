@@ -1,0 +1,337 @@
+{
+  // ============================================================================
+  // EAS CLI CONFIGURATION
+  // ============================================================================
+  "cli": {
+    // Minimum EAS CLI version required (update if needed)
+    // Check your version: eas --version
+    "version": ">= 5.0.0",
+
+    // If true, requires a git commit before building
+    // Set to false for flexibility during development
+    "requireCommit": false,
+
+    // Where to get app version for builds
+    // Options: "local" (from app.json), "remote" (from Expo)
+    "appVersionSource": "local"
+  },
+
+  // ============================================================================
+  // BUILD PROFILES
+  // ============================================================================
+  "build": {
+    // ========================================================================
+    // DEVELOPMENT PROFILE
+    // Purpose: Local testing with hot reload
+    // Build type: APK
+    // API URL: Local backend (your machine's IP:3000)
+    // Use: eas build --platform android --profile development
+    // ========================================================================
+    "development": {
+      // Enable Expo Development Client for hot reload and debugging
+      // When true: Your custom development app
+      // When false: Standalone app (Preview/Production)
+      "developmentClient": true,
+
+      // Distribution method
+      // "internal": Private build, not on Play Store
+      // "store": Google Play Store (Production only)
+      "distribution": "internal",
+
+      // EAS Update channel name (optional)
+      // Use for pushing OTA updates after build
+      "channel": "development",
+
+      // ====================================================================
+      // ENVIRONMENT VARIABLES INJECTED INTO APP
+      // ====================================================================
+      "env": {
+        // Your local machine's network IP and backend port
+        // IMPORTANT: Replace 192.168.1.100 with YOUR machine's IP
+        // Find IP: ifconfig (Mac/Linux) or ipconfig (Windows)
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:3000",
+
+        // Environment identifier (used for feature flags, analytics)
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
+
+        // RULE: All public variables MUST start with EXPO_PUBLIC_
+        // Variables without this prefix are considered secrets (not bundled)
+      },
+
+      // ====================================================================
+      // ANDROID-SPECIFIC CONFIGURATION
+      // ====================================================================
+      "android": {
+        // Build output type
+        // "apk": Installable directly on device
+        // "aab": Android App Bundle (Play Store only)
+        "buildType": "apk",
+
+        // Gradle command to execute during build
+        // assembleRelease: Builds signed APK
+        // bundleRelease: Builds App Bundle (Play Store)
+        "gradleCommand": ":app:assembleRelease",
+
+        // Skip credentials for unsigned builds
+        "withoutCredentials": false,
+
+        // Use Gradle Build Service (newer, recommended)
+        "useClassicBuildService": false,
+
+        // Android NDK version for native code compilation
+        "ndk": "23.1.7779620",
+
+        // ================================================================
+        // KEYSTORE CONFIGURATION (Signs the APK)
+        // ================================================================
+        "keystoreType": "jks",
+
+        "keystore": {
+          // Path to keystore file (relative to project root)
+          // Generate with: keytool -genkey -v -keystore android/keystore.jks...
+          "keystorePath": "android/keystore.jks",
+
+          // Keystore password (prompt on first build, then stored securely)
+          // Replace with YOUR keystore password
+          "keystorePassword": "KEYSTORE_PASSWORD",
+
+          // Unique identifier for this key within the keystore
+          // Usually "app-alias" or similar
+          "keyAlias": "tradify-dev",
+
+          // Password for this specific key
+          // Replace with YOUR key password
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+
+      // ====================================================================
+      // iOS CONFIGURATION (For future iOS build)
+      // ====================================================================
+      "ios": {
+        "buildType": "simulator",
+        "simulator": true
+      },
+
+      // ====================================================================
+      // BUILD ENVIRONMENT
+      // ====================================================================
+      // Node.js version used during build (must be available)
+      "node": "18.13.0",
+
+      // Yarn version used during build
+      "yarn": "3.6.0"
+    },
+
+    // ========================================================================
+    // PREVIEW PROFILE
+    // Purpose: Standalone APK for QA/tester distribution
+    // Build type: APK
+    // API URL: Staging server
+    // Use: eas build --platform android --profile preview
+    // Notes: Can be downloaded and installed without Expo account
+    // ========================================================================
+    "preview": {
+      // Use standalone app (no dev client)
+      "developmentClient": false,
+
+      // Internal distribution (not on Play Store)
+      "distribution": "internal",
+
+      // EAS Update channel for this profile
+      "channel": "preview",
+
+      // ====================================================================
+      // ENVIRONMENT VARIABLES FOR PREVIEW
+      // ====================================================================
+      "env": {
+        // Staging API server
+        // Change this to your staging domain
+        "EXPO_PUBLIC_API_URL": "https://staging-api.tradify.ng",
+
+        // Environment identifier
+        "EXPO_PUBLIC_ENVIRONMENT": "staging"
+
+        // Now app will connect to staging backend
+        // Perfect for QA testing before production
+      },
+
+      // ====================================================================
+      // ANDROID CONFIGURATION
+      // ====================================================================
+      "android": {
+        // Must be APK for QA testers (AAB is Play Store only)
+        "buildType": "apk",
+
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentials": false,
+        "useClassicBuildService": false,
+        "ndk": "23.1.7779620",
+
+        "keystoreType": "jks",
+
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          // Different key alias for preview
+          "keyAlias": "tradify-staging",
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+
+      // iOS configuration for future
+      "ios": {
+        "buildType": "archive",
+        "simulator": false
+      },
+
+      "node": "18.13.0",
+      "yarn": "3.6.0"
+    },
+
+    // ========================================================================
+    // PRODUCTION PROFILE
+    // Purpose: AAB bundle for Google Play Store release
+    // Build type: AAB (Android App Bundle)
+    // API URL: Production server
+    // Use: eas build --platform android --profile production
+    // Notes: Must use AAB for Play Store
+    // ========================================================================
+    "production": {
+      // Standalone app (no dev client)
+      "developmentClient": false,
+
+      // Store distribution (Google Play Store)
+      "distribution": "store",
+
+      // EAS Update channel (for pushing updates after release)
+      "channel": "production",
+
+      // ====================================================================
+      // ENVIRONMENT VARIABLES FOR PRODUCTION
+      // ====================================================================
+      "env": {
+        // Production API server
+        // This is your live backend
+        "EXPO_PUBLIC_API_URL": "https://api.tradify.ng",
+
+        // Environment identifier for production
+        "EXPO_PUBLIC_ENVIRONMENT": "production"
+
+        // App will connect to production API
+        // This is what real users will use
+      },
+
+      // ====================================================================
+      // ANDROID CONFIGURATION FOR PLAY STORE
+      // ====================================================================
+      "android": {
+        // CRITICAL: Must be AAB for Google Play Store
+        // APK is for testing, AAB is for store distribution
+        "buildType": "aab",
+
+        // Use bundleRelease for AAB output
+        "gradleCommand": ":app:bundleRelease",
+
+        "withoutCredentials": false,
+        "useClassicBuildService": false,
+        "ndk": "23.1.7779620",
+
+        "keystoreType": "jks",
+
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          // Production key alias
+          "keyAlias": "tradify-prod",
+          "keyPassword": "KEY_PASSWORD"
+        },
+
+        // ================================================================
+        // ANDROID PERMISSIONS
+        // ================================================================
+        // Request permissions the app needs on Android
+        // Users will be prompted on install/first use
+        "permissions": [
+          "INTERNET",                    // Network access for API calls
+          "ACCESS_NETWORK_STATE",        // Check network connectivity
+          "WRITE_EXTERNAL_STORAGE",      // Save files (if needed)
+          "READ_EXTERNAL_STORAGE",       // Read files (if needed)
+          "ACCESS_FINE_LOCATION",        // GPS location (if needed)
+          "ACCESS_COARSE_LOCATION"       // Approximate location (if needed)
+        ]
+      },
+
+      // iOS configuration for future
+      "ios": {
+        "buildType": "archive",
+        "simulator": false
+      },
+
+      "node": "18.13.0",
+      "yarn": "3.6.0",
+
+      // ====================================================================
+      // AUTO-INCREMENT BUILD NUMBER
+      // ====================================================================
+      // Automatically increment buildNumber for each production build
+      // Version stays same, buildNumber increments:
+      // v1.0.0 (1) → v1.0.0 (2) → v1.0.0 (3) etc.
+      // Play Store uses buildNumber to detect new releases
+      "autoIncrement": true
+    }
+  },
+
+  // ============================================================================
+  // SUBMISSION CONFIGURATION
+  // ============================================================================
+  // Configure automatic submission to app stores
+  "submit": {
+    // Only production profile submits to stores
+    "production": {
+      // Google Play Store (Android)
+      "android": {
+        // Path to service account JSON file
+        // Download from Google Play Console → Settings → API access
+        // Create service account → Download JSON → Save here
+        // Add to .gitignore! (Don't commit secrets)
+        "serviceAccountKeyPath": "./service-account-key.json",
+
+        // Release track determines audience
+        // "internal": Internal testing only
+        // "alpha": Closed alpha testing
+        // "beta": Closed beta testing
+        // "production": Public release
+        "track": "internal",
+
+        // Whether changes have been sent for review
+        // Set to false initially
+        "changesNotSentForReview": false
+      }
+
+      // iOS submission configuration (for future)
+      // "ios": { "appleId": "...", "appleTeamId": "..." }
+    }
+  }
+
+  // ============================================================================
+  // USAGE EXAMPLES
+  // ============================================================================
+  // Build Development:
+  //   eas build --platform android --profile development --wait
+  //   → APK with hot reload, connects to localhost:3000
+  //
+  // Build Preview:
+  //   eas build --platform android --profile preview --wait
+  //   → Shareable APK for testers, connects to staging API
+  //   → Download link shows after build completes
+  //
+  // Build Production:
+  //   eas build --platform android --profile production --wait
+  //   → AAB for Play Store, connects to production API
+  //   → Can submit with: eas submit --platform android --profile production
+  //
+  // Clear cache if build fails:
+  //   eas build --platform android --profile production --clear-cache --wait
+  // ============================================================================
+}

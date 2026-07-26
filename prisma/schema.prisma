@@ -1,0 +1,421 @@
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  ARTISAN
+  CLIENT
+  ADMIN
+}
+
+enum JobStatus {
+  DRAFT
+  ACCEPTED
+  MATERIAL_SOURCED
+  IN_PROGRESS
+  AWAITING_INSPECTION
+  COMPLETED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  PAYSTACK_ESCROW
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum ExpenseCategory {
+  FUEL
+  TRANSPORT
+  TOOLS
+  EQUIPMENT
+  OTHER
+}
+
+// ============================================================================
+// USERS TABLE
+// ============================================================================
+
+model User {
+  id                    String   @id @default(cuid())
+  role                  UserRole
+  email                 String   @unique
+  phone                 String
+  firstName             String
+  lastName              String
+  profileImage          String?
+
+  // Artisan-specific
+  trade                 String?
+  bio                   String?
+  yearsOfExperience     Int?
+  rating                Float?   @default(0)
+  ratingCount           Int?     @default(0)
+
+  // Financial
+  bankAccountName       String?
+  bankAccountNumber     String?
+  bankCode              String?
+  paystackCustomerId    String?
+
+  // Address
+  state                 String
+  city                  String
+  address               String?
+
+  // Auth
+  passwordHash          String
+  passwordSalt          String
+
+  // Contact
+  whatsappNumber        String?
+
+  // Verification
+  emailVerified         Boolean  @default(false)
+  phoneVerified         Boolean  @default(false)
+
+  // Sync metadata (required for offline sync)
+  serverVersion         Int      @default(0)
+  deleted               Boolean  @default(false)
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  artisanJobs           Job[]    @relation("ArtisanJobs")
+  clientJobs            Job[]    @relation("ClientJobs")
+  payments              Payment[]
+  expenseLogs           ExpenseLog[]
+  invoices              Invoice[]
+
+  @@index([email])
+  @@index([role])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// JOBS TABLE
+// ============================================================================
+
+model Job {
+  id                    String   @id @default(cuid())
+
+  // Party references
+  artisanId             String
+  artisan               User     @relation("ArtisanJobs", fields: [artisanId], references: [id], onDelete: Cascade)
+
+  clientId              String
+  client                User     @relation("ClientJobs", fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Job details
+  title                 String
+  description           String
+  category              String
+  location              String
+
+  // Status
+  status                JobStatus @default(DRAFT)
+  priority              String?
+
+  // Costs
+  estimatedCost         Float?
+  materialCost          Float    @default(0)
+  laborFee              Float    @default(0)
+  taxAmount             Float    @default(0)
+  discountAmount        Float    @default(0)
+  totalAmount           Float    @default(0)
+
+  // Payment tracking
+  paidAmount            Float    @default(0)
+  pendingAmount         Float    @default(0)
+
+  // Timing
+  scheduledDate         DateTime?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  dueDate               DateTime?
+
+  // Notes
+  notes                 String?
+  clientNotes           String?
+  artisanNotes          String?
+
+  // Media
+  images                String[] @default([])
+
+  // Sync metadata
+  serverVersion         Int      @default(0)
+  deleted               Boolean  @default(false)
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  invoice               Invoice?
+  payments              Payment[]
+  expenseLogs           ExpenseLog[]
+
+  @@index([artisanId])
+  @@index([clientId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// INVOICES TABLE
+// ============================================================================
+
+model Invoice {
+  id                    String   @id @default(cuid())
+
+  // References
+  jobId                 String   @unique
+  job                   Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  artisanId             String
+  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  // Invoice metadata
+  invoiceNumber         String   @unique
+
+  // Line items
+  items                 InvoiceItem[]
+
+  // Totals
+  subtotal              Float    @default(0)
+  taxRate               Float    @default(0.075)
+  taxAmount             Float    @default(0)
+  discountAmount        Float    @default(0)
+  totalAmount           Float    @default(0)
+
+  // Payment tracking
+  amountPaid            Float    @default(0)
+  amountDue             Float    @default(0)
+
+  // Status
+  status                String   @default("draft") // draft, sent, viewed, accepted, paid
+  paidStatus            String   @default("unpaid") // unpaid, partially_paid, paid
+
+  // Dates
+  issuedAt              DateTime @default(now())
+  dueDate               DateTime?
+  paidAt                DateTime?
+
+  // Notes
+  notes                 String?
+  paymentTerms          String?
+
+  // Sync metadata
+  serverVersion         Int      @default(0)
+  deleted               Boolean  @default(false)
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  payments              Payment[]
+
+  @@index([artisanId])
+  @@index([jobId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// INVOICE ITEMS TABLE
+// ============================================================================
+
+model InvoiceItem {
+  id                    String   @id @default(cuid())
+
+  invoiceId             String
+  invoice               Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Item details
+  description           String
+  quantity              Float
+  unitPrice             Float
+  amount                Float
+
+  // Classification
+  category              String // material, labor, service
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+// ============================================================================
+// PAYMENTS TABLE
+// ============================================================================
+
+model Payment {
+  id                    String   @id @default(cuid())
+
+  // References
+  invoiceId             String?
+  invoice               Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  jobId                 String?
+  job                   Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  artisanId             String
+  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  // Details
+  amount                Float
+  method                PaymentMethod
+  status                PaymentStatus @default(PENDING)
+
+  // References
+  transactionId         String?
+  receiptNumber         String?
+  paystackTransferId    String?
+
+  // Proof
+  proofOfPayment        String?
+  notes                 String?
+
+  // Dates
+  paidAt                DateTime?
+  recordedAt            DateTime @default(now())
+
+  // Sync metadata
+  serverVersion         Int      @default(0)
+  deleted               Boolean  @default(false)
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([artisanId])
+  @@index([invoiceId])
+  @@index([jobId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// EXPENSE LOGS TABLE
+// ============================================================================
+
+model ExpenseLog {
+  id                    String   @id @default(cuid())
+
+  artisanId             String
+  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  // Details
+  category              ExpenseCategory
+  description           String
+  amount                Float
+
+  // Timing
+  expenseDate           DateTime
+  recordedAt            DateTime @default(now())
+
+  // Optional job link
+  jobId                 String?
+  job                   Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  // Notes
+  notes                 String?
+  receipt               String?
+
+  // Sync metadata
+  serverVersion         Int      @default(0)
+  deleted               Boolean  @default(false)
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([artisanId])
+  @@index([expenseDate])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// SYNC HISTORY TABLE (for audit trail and debugging)
+// ============================================================================
+
+model SyncLog {
+  id                    String   @id @default(cuid())
+
+  // Sync metadata
+  artisanId             String?  // Which artisan's data was synced
+  operation             String   // "push", "pull", "conflict_resolved"
+
+  // Change details
+  entityType            String   // "job", "invoice", "payment", etc.
+  entityId              String
+  clientVersion         Int?
+  serverVersion         Int?
+
+  // Conflict info (if applicable)
+  hadConflict           Boolean  @default(false)
+  conflictResolution    String?  // "server-wins", "merged", etc.
+
+  // Request/Response
+  requestSize           Int?     // Bytes
+  responseSize          Int?     // Bytes
+
+  // Status
+  success               Boolean  @default(true)
+  error                 String?
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+
+  @@index([artisanId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PROCESSED WEBHOOKS TABLE (for idempotency)
+// ============================================================================
+
+model ProcessedWebhook {
+  id                    String   @id @default(cuid())
+
+  // Webhook reference (unique per Paystack webhook)
+  paystackReference     String   @unique
+
+  // Event tracking
+  event                 String   // "charge.success", "transfer.success", etc.
+  payloadHash           String   // SHA256 hash of payload for verification
+
+  // Timestamps
+  processedAt           DateTime @default(now())
+  retryCount            Int      @default(0)
+
+  @@index([paystackReference])
+  @@index([event])
+  @@index([processedAt])
+}

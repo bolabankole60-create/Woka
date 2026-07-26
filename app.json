@@ -1,0 +1,95 @@
+{
+  "expo": {
+    "name": "Tradify",
+    "slug": "tradify",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletMode": true,
+      "bundleIdentifier": "com.tradify.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "This app uses local network for offline functionality.",
+        "NSBonjourServiceTypes": [
+          "_tradify._tcp"
+        ],
+        "UIRequiredDeviceCapabilities": [
+          "armv7"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.tradify.app",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "useNextNotificationApi": true,
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow Tradify to use Face ID to secure your data."
+        }
+      ],
+      [
+        "expo-file-system",
+        {
+          "photosPermission": "Allow Tradify to access your photos."
+        }
+      ],
+      [
+        "expo-sharing",
+        {}
+      ]
+    ],
+    "experiments": {
+      "tsTester": true,
+      "typedRoutes": true
+    },
+    "scheme": "tradify"
+  },
+  "eas": {
+    "build": {
+      "experimental": {
+        "ios": false
+      },
+      "node": "18.13.0",
+      "npm": {
+        "version": "~9.2.0"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.tradify.local"
+      }
+    },
+    "submit": {
+      "production": {}
+    }
+  }
+}

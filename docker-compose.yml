@@ -1,0 +1,158 @@
+# Docker Compose for Tradify Backend
+#
+# Starts a local PostgreSQL database with persistent storage.
+# Data is persisted in a Docker volume so it survives container restarts.
+#
+# Usage:
+#   docker-compose up        # Start services (foreground)
+#   docker-compose up -d     # Start services (background)
+#   docker-compose down      # Stop and remove containers
+#   docker-compose logs -f   # View logs
+#   docker-compose ps        # List running services
+
+version: '3.9'
+
+services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: tradify-postgres
+    restart: unless-stopped
+
+    # Environment variables for database
+    environment:
+      # Database root user
+      POSTGRES_USER: tradify
+      POSTGRES_PASSWORD: tradify
+      POSTGRES_DB: tradify_db
+
+      # PostgreSQL configuration
+      POSTGRES_INITDB_ARGS: >
+        -c shared_buffers=256MB
+        -c effective_cache_size=1GB
+        -c work_mem=16MB
+        -c maintenance_work_mem=64MB
+
+    # Ports
+    ports:
+      # Host:Container mapping
+      # Change 5432:5432 to 5433:5432 if you have PostgreSQL running locally
+      - '5432:5432'
+
+    # Data persistence
+    volumes:
+      # Named volume for data persistence
+      - tradify_postgres_data:/var/lib/postgresql/data
+
+      # Optional: initialization scripts
+      # - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    # Health check
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U tradify -d tradify_db',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Logging
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ============================================================================
+  # PgAdmin - PostgreSQL Management UI (Optional)
+  # ============================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tradify-pgadmin
+    restart: unless-stopped
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@tradify.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      SCRIPT_NAME: /pgadmin
+
+    ports:
+      - '5050:80'
+
+    depends_on:
+      - postgres
+
+    volumes:
+      # PgAdmin data persistence
+      - tradify_pgadmin_data:/var/lib/pgadmin
+
+    # Only start if ENABLE_PGADMIN=true
+    profiles:
+      - admin
+
+volumes:
+  # Named volume for PostgreSQL data
+  tradify_postgres_data:
+    driver: local
+
+  # Named volume for PgAdmin data
+  tradify_pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: tradify-network
+    driver: bridge
+
+# ============================================================================
+# USAGE GUIDE
+# ============================================================================
+#
+# 1. START SERVICES
+#    docker-compose up -d
+#
+# 2. VERIFY CONNECTION
+#    psql -U tradify -d tradify_db -h localhost
+#    Password: tradify
+#
+# 3. CREATE SCHEMA
+#    npx prisma migrate deploy
+#
+# 4. SEED DATA (Optional)
+#    npx prisma db seed
+#
+# 5. VIEW LOGS
+#    docker-compose logs -f postgres
+#
+# 6. CONNECT FROM APP
+#    DATABASE_URL=postgresql://tradify:tradify@localhost:5432/tradify_db
+#
+# 7. OPTIONAL: USE PGADMIN
+#    docker-compose --profile admin up -d
+#    Open: http://localhost:5050
+#    Login: admin@tradify.local / admin
+#    Add Server: host=postgres, port=5432, user=tradify, pass=tradify
+#
+# 8. STOP SERVICES
+#    docker-compose down
+#
+# 9. STOP AND REMOVE DATA
+#    docker-compose down -v
+#
+# ============================================================================

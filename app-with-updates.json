@@ -1,0 +1,121 @@
+{
+  "expo": {
+    "name": "Tradify",
+    "slug": "tradify",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-updates",
+        {
+          // ======================================================================
+          // EXPO UPDATES CONFIGURATION
+          // ======================================================================
+
+          // Your Expo project URL for fetching updates
+          // Format: https://u.expo.dev/YOUR_PROJECT_ID
+          // Get PROJECT_ID from: expo config --type public | jq '.projectId'
+          // Or from: https://expo.dev (your project page)
+          "url": "https://u.expo.dev/YOUR_PROJECT_ID",
+
+          // ======================================================================
+          // RUNTIME VERSION STRATEGY
+          // ======================================================================
+          // Determines compatibility between updates and native code
+          //
+          // "sdkVersion": Uses Expo SDK version (recommended)
+          //   - Only compatible with same SDK version
+          //   - Prevents runtime crashes from native API changes
+          //   - New native dependencies = new APK required
+          //
+          // "appVersion": Uses app.json version field
+          //   - More flexible for minor updates
+          //   - Risk: Incompatible updates crash app
+          //
+          // Custom string: Your own versioning scheme
+          //   - Full control but manual management
+          "runtimeVersion": "sdkVersion",
+
+          // ======================================================================
+          // UPDATE CHECK POLICY
+          // ======================================================================
+          // When to check for updates on app startup
+          //
+          // "ON_APP_START": Check every time app starts (recommended)
+          //   - Ensures users get latest updates quickly
+          //   - ~200ms overhead on startup (cached)
+          //
+          // "ON_LOAD": Check when first screen loads
+          //   - Slightly delayed, but faster initial render
+          //
+          // "WIFI_ONLY": Only check on WiFi connection
+          //   - Save data for mobile users
+          //
+          // "NEVER": Disable automatic checks
+          //   - Manual update triggering only
+          "checkAutomatically": "ON_APP_START",
+
+          // ======================================================================
+          // FALLBACK CACHE TIMEOUT
+          // ======================================================================
+          // Max time (ms) to wait for update before using cached version
+          // Trades off freshness vs instant loading
+          //
+          // Value: 3000 (3 seconds)
+          // - Wait 3 seconds for update download
+          // - If network timeout, load from cache instantly
+          // - Perfect for unreliable Nigerian networks
+          //
+          // Why 3 seconds?
+          // - Fast enough to not frustrate users
+          // - Long enough for typical 3G connection
+          // - Cache ensures app always loads
+          //
+          // Adjust based on your metrics:
+          // - Higher (5000): Prioritize freshness
+          // - Lower (1500): Prioritize speed
+          "fallbackToCacheTimeout": 3000
+        }
+      ]
+    ],
+
+    "ios": {
+      "supportsTabletMode": true,
+      "bundleIdentifier": "com.tradify.app"
+    },
+
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.tradify.app",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json"
+    },
+
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+
+    "description": "Offline-first marketplace for Nigerian artisans. Secure payments, job tracking, expense logging.",
+    "primaryColor": "#0066cc",
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_PROJECT_ID"
+      }
+    },
+
+    "owner": "YOUR_EXPO_USERNAME"
+  }
+}

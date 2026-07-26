@@ -1,0 +1,114 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "requireCommit": false,
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:3000",
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentials": false,
+        "useClassicBuildService": false,
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-dev",
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+      "ios": {
+        "buildType": "simulator",
+        "simulator": true
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0"
+    },
+    "preview": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging-api.tradify.ng",
+        "EXPO_PUBLIC_ENVIRONMENT": "staging"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentials": false,
+        "useClassicBuildService": false,
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-staging",
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+      "ios": {
+        "buildType": "archive",
+        "simulator": false
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0"
+    },
+    "production": {
+      "developmentClient": false,
+      "distribution": "store",
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.tradify.ng",
+        "EXPO_PUBLIC_ENVIRONMENT": "production"
+      },
+      "android": {
+        "buildType": "aab",
+        "gradleCommand": ":app:bundleRelease",
+        "withoutCredentials": false,
+        "useClassicBuildService": false,
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-prod",
+          "keyPassword": "KEY_PASSWORD"
+        },
+        "permissions": [
+          "INTERNET",
+          "ACCESS_NETWORK_STATE",
+          "WRITE_EXTERNAL_STORAGE",
+          "READ_EXTERNAL_STORAGE",
+          "ACCESS_FINE_LOCATION",
+          "ACCESS_COARSE_LOCATION"
+        ]
+      },
+      "ios": {
+        "buildType": "archive",
+        "simulator": false
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./service-account-key.json",
+        "track": "internal",
+        "changesNotSentForReview": false
+      }
+    }
+  }
+}

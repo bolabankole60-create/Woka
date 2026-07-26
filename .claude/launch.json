@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "expo-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web"],
+      "port": 19006,
+      "url": "http://localhost:19006"
+    },
+    {
+      "name": "expo-start",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start"],
+      "port": 19000
+    }
+  ]
+}

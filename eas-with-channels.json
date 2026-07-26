@@ -1,0 +1,158 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "requireCommit": false,
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      // ====================================================================
+      // CHANNEL CONFIGURATION FOR EXPO UPDATES
+      // ====================================================================
+      // Channel name for OTA updates using this build
+      // Updates pushed to this channel will be fetched by apps with this channel
+      //
+      // "development": Only your local dev builds receive these updates
+      // - Isolated from other environments
+      // - Perfect for rapid iteration
+      // - Only you test these changes
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:3000",
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-dev",
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0"
+    },
+
+    "preview": {
+      "developmentClient": false,
+      "distribution": "internal",
+      // ====================================================================
+      // PREVIEW CHANNEL
+      // ====================================================================
+      // Channel for QA/tester builds
+      //
+      // "preview": All testers with preview APK receive these updates
+      // - Isolated from production users
+      // - QA team gets latest fixes
+      // - Testing new features before production
+      //
+      // Workflow:
+      // 1. Build preview APK: eas build --profile preview
+      // 2. Testers install APK (channels linked in app.json)
+      // 3. Push update: eas update --channel preview
+      // 4. All testers' phones fetch update automatically
+      // 5. No APK re-download needed
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging-api.tradify.ng",
+        "EXPO_PUBLIC_ENVIRONMENT": "staging"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-staging",
+          "keyPassword": "KEY_PASSWORD"
+        }
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0"
+    },
+
+    "production": {
+      "developmentClient": false,
+      "distribution": "store",
+      // ====================================================================
+      // PRODUCTION CHANNEL
+      // ====================================================================
+      // Channel for Play Store releases
+      //
+      // "production": All production users receive these updates
+      // - Downloaded via Play Store
+      // - Updates deployed after release
+      // - Used for instant bug fixes
+      //
+      // Important:
+      // - runtimeVersion: "sdkVersion" prevents incompatible updates
+      // - Updates can't introduce new native dependencies
+      // - For native changes, must release new APK
+      //
+      // Workflow:
+      // 1. Release APK to Play Store: eas submit --profile production
+      // 2. Users download from Play Store
+      // 3. Push hotfix: eas update --channel production
+      // 4. All users' phones fetch update automatically
+      // 5. Users see updated features without re-downloading APK
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.tradify.ng",
+        "EXPO_PUBLIC_ENVIRONMENT": "production"
+      },
+      "android": {
+        "buildType": "aab",
+        "gradleCommand": ":app:bundleRelease",
+        "ndk": "23.1.7779620",
+        "keystoreType": "jks",
+        "keystore": {
+          "keystorePath": "android/keystore.jks",
+          "keystorePassword": "KEYSTORE_PASSWORD",
+          "keyAlias": "tradify-prod",
+          "keyPassword": "KEY_PASSWORD"
+        },
+        "permissions": [
+          "INTERNET",
+          "ACCESS_NETWORK_STATE",
+          "WRITE_EXTERNAL_STORAGE",
+          "READ_EXTERNAL_STORAGE",
+          "ACCESS_FINE_LOCATION",
+          "ACCESS_COARSE_LOCATION"
+        ]
+      },
+      "node": "18.13.0",
+      "yarn": "3.6.0",
+      "autoIncrement": true
+    }
+  },
+
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./service-account-key.json",
+        "track": "internal",
+        "changesNotSentForReview": false
+      }
+    }
+  },
+
+  // ========================================================================
+  // UPDATE CONFIGURATION (Expo Updates)
+  // ========================================================================
+  // Configure how updates are fetched and rolled out
+  "update": {
+    // Default channel for updates (if not specified in build)
+    "channel": "preview",
+
+    // Automatic release configuration
+    "automaticallyPublishNewUpdates": true
+  }
+}
