@@ -18,20 +18,23 @@ import {
   Alert,
   Linking,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCustomerById } from '@/hooks/useCustomers';
+import { useSyncAfterMutation } from '@/hooks/useSync';
 import { initializeDatabase } from '@/db/database';
 import { CustomerService } from '@/services/customerService';
 import * as SecureStore from 'expo-secure-store';
+import type { Database } from '@nozbe/watermelondb';
 
 export default function CustomerDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const [db, setDb] = useState<any>(null);
+  const [db, setDb] = useState<Database | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const syncAfterMutation = useSyncAfterMutation(db);
 
   // Initialize database and user
   useEffect(() => {
@@ -64,6 +67,7 @@ export default function CustomerDetailsScreen() {
 
             if (result.success) {
               Alert.alert('Success', 'Customer archived');
+              await syncAfterMutation(customer.id);
             } else {
               Alert.alert('Error', result.error || 'Failed to archive');
             }
@@ -157,8 +161,7 @@ export default function CustomerDetailsScreen() {
             <MaterialCommunityIcons name="whatsapp" size={20} color="#fff" style={{ textAlign: 'center' }} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => {
-            // @ts-ignore - Expo Router strict typing limitation
-            router.push(`/customers/${customer.id}/edit`);
+            router.push(`/customers/${customer.id}/edit` as Href);
           }} style={{ flex: 1, paddingVertical: 12, borderRadius: 6, backgroundColor: '#2196F3' }}>
             <MaterialCommunityIcons name="pencil" size={20} color="#fff" style={{ textAlign: 'center' }} />
           </TouchableOpacity>

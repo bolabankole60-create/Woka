@@ -21,21 +21,23 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from '@/db/database';
 import { useSearchCustomers } from '@/hooks/useCustomers';
+import { useManualSync } from '@/hooks/useSync';
 import { formatPhoneDisplay } from '@/utils/formatting';
 import * as SecureStore from 'expo-secure-store';
 import type Customer from '@/models/Customer';
+import type { Database } from '@nozbe/watermelondb';
 
 export default function CustomersScreen() {
   const router = useRouter();
-  const [db, setDb] = useState<any>(null);
+  const [db, setDb] = useState<Database | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { isLoading: isSyncing, syncNow } = useManualSync(db);
 
   // Initialize database and load user ID
   useEffect(() => {
@@ -54,13 +56,15 @@ export default function CustomersScreen() {
   const customers = useSearchCustomers(db, userId, search, showArchived);
 
   const handleAddCustomer = () => {
-    // @ts-ignore - Expo Router strict typing limitation
-    router.push('/customers/new');
+    router.push('/customers/new' as Href);
   };
 
   const handleEditCustomer = (customerId: string) => {
-    // @ts-ignore - Expo Router strict typing limitation with dynamic params
-    router.push(`/customers/${customerId}`);
+    router.push(`/customers/${customerId}` as Href);
+  };
+
+  const handleRefresh = async () => {
+    await syncNow();
   };
 
   const renderCustomerItem = ({ item }: { item: Customer }) => (
@@ -220,12 +224,8 @@ export default function CustomersScreen() {
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={async () => {
-                setIsRefreshing(true);
-                // In a full implementation, trigger sync here
-                setIsRefreshing(false);
-              }}
+              refreshing={isSyncing}
+              onRefresh={handleRefresh}
             />
           }
           contentContainerStyle={{ paddingVertical: 12 }}

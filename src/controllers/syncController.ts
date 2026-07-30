@@ -395,6 +395,84 @@ async function handleJobOperation(
     return { ...baseResult, serverVersion: existing.serverVersion + 1 };
   }
 
+  if (operation === 'complete') {
+    const existing = await tx.job.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Job not found' };
+    }
+
+    const updated = await tx.job.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion };
+  }
+
+  if (operation === 'reopen') {
+    const existing = await tx.job.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Job not found' };
+    }
+
+    const updated = await tx.job.update({
+      where: { id },
+      data: {
+        status: 'IN_PROGRESS',
+        completedAt: null,
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion };
+  }
+
+  if (operation === 'archive') {
+    const existing = await tx.job.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Job not found' };
+    }
+
+    const updated = await tx.job.update({
+      where: { id },
+      data: {
+        isArchived: true,
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion };
+  }
+
+  if (operation === 'restore') {
+    const existing = await tx.job.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Job not found' };
+    }
+
+    const updated = await tx.job.update({
+      where: { id },
+      data: {
+        isArchived: false,
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion };
+  }
+
   return { ...baseResult, success: false, error: 'Invalid operation' };
 }
 

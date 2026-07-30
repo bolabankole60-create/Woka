@@ -15,17 +15,19 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { isValidNigerianPhone } from '@/utils/phoneFormatter';
 import { CustomerService } from '@/services/customerService';
+import { useSyncAfterMutation } from '@/hooks/useSync';
 import { initializeDatabase } from '@/db/database';
 import * as SecureStore from 'expo-secure-store';
+import type { Database } from '@nozbe/watermelondb';
 
 export default function NewCustomerScreen() {
   const router = useRouter();
 
-  const [db, setDb] = useState<any>(null);
+  const [db, setDb] = useState<Database | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -33,6 +35,7 @@ export default function NewCustomerScreen() {
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const syncAfterMutation = useSyncAfterMutation(db);
 
   // Initialize database
   useEffect(() => {
@@ -93,9 +96,10 @@ export default function NewCustomerScreen() {
         return;
       }
 
-      // Navigate to details screen (local customer now available)
-      // @ts-ignore - Expo Router strict typing limitation with dynamic params
-      router.replace(`/customers/${result.data.id}`);
+      // Navigate to details screen and sync in background
+      const customerId = result.data.id;
+      router.replace(`/customers/${customerId}` as Href);
+      await syncAfterMutation(customerId);
     } catch (error) {
       Alert.alert('Error', `Failed to create customer: ${String(error)}`);
     } finally {
