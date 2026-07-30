@@ -58,60 +58,102 @@ enum ExpenseCategory {
 // ============================================================================
 
 model User {
-  id                    String   @id @default(cuid())
-  role                  UserRole
-  email                 String   @unique
-  phone                 String
-  firstName             String
-  lastName              String
-  profileImage          String?
+  id           String   @id @default(cuid())
+  role         UserRole
+  email        String   @unique
+  phone        String
+  firstName    String
+  lastName     String
+  profileImage String?
 
   // Artisan-specific
-  trade                 String?
-  bio                   String?
-  yearsOfExperience     Int?
-  rating                Float?   @default(0)
-  ratingCount           Int?     @default(0)
+  trade             String?
+  bio               String?
+  yearsOfExperience Int?
+  rating            Float?  @default(0)
+  ratingCount       Int?    @default(0)
 
   // Financial
-  bankAccountName       String?
-  bankAccountNumber     String?
-  bankCode              String?
-  paystackCustomerId    String?
+  bankAccountName    String?
+  bankAccountNumber  String?
+  bankCode           String?
+  paystackCustomerId String?
 
   // Address
-  state                 String
-  city                  String
-  address               String?
+  state   String
+  city    String
+  address String?
 
   // Auth
-  passwordHash          String
-  passwordSalt          String
+  passwordHash String
+  passwordSalt String
 
   // Contact
-  whatsappNumber        String?
+  whatsappNumber String?
 
   // Verification
-  emailVerified         Boolean  @default(false)
-  phoneVerified         Boolean  @default(false)
+  emailVerified Boolean @default(false)
+  phoneVerified Boolean @default(false)
 
   // Sync metadata (required for offline sync)
-  serverVersion         Int      @default(0)
-  deleted               Boolean  @default(false)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
 
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  artisanJobs           Job[]    @relation("ArtisanJobs")
-  clientJobs            Job[]    @relation("ClientJobs")
-  payments              Payment[]
-  expenseLogs           ExpenseLog[]
-  invoices              Invoice[]
+  artisanJobs Job[]        @relation("ArtisanJobs")
+  clientJobs  Job[]        @relation("ClientJobs")
+  customers   Customer[]   @relation("ArtisanCustomers")
+  payments    Payment[]
+  expenseLogs ExpenseLog[]
+  invoices    Invoice[]
 
   @@index([email])
   @@index([role])
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// CUSTOMERS TABLE
+// ============================================================================
+
+model Customer {
+  id String @id @default(cuid())
+
+  // Ownership
+  artisanId String
+  artisan   User   @relation("ArtisanCustomers", fields: [artisanId], references: [id], onDelete: Cascade)
+
+  // Customer info
+  name            String
+  phone           String
+  normalizedPhone String // Stored in E.164 format for deduplication
+  email           String?
+  address         String?
+  notes           String?
+
+  // Status
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  // Sync metadata (required for offline sync)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  jobs     Job[]
+  payments Payment[]
+
+  @@unique([artisanId, normalizedPhone])
+  @@index([artisanId])
+  @@index([isArchived])
   @@index([updatedAt])
 }
 
@@ -120,66 +162,70 @@ model User {
 // ============================================================================
 
 model Job {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Party references
-  artisanId             String
-  artisan               User     @relation("ArtisanJobs", fields: [artisanId], references: [id], onDelete: Cascade)
+  artisanId String
+  artisan   User   @relation("ArtisanJobs", fields: [artisanId], references: [id], onDelete: Cascade)
 
-  clientId              String
-  client                User     @relation("ClientJobs", fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  client   User   @relation("ClientJobs", fields: [clientId], references: [id], onDelete: Cascade)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   // Job details
-  title                 String
-  description           String
-  category              String
-  location              String
+  title       String
+  description String
+  category    String
+  location    String
 
   // Status
-  status                JobStatus @default(DRAFT)
-  priority              String?
+  status   JobStatus @default(DRAFT)
+  priority String?
 
   // Costs
-  estimatedCost         Float?
-  materialCost          Float    @default(0)
-  laborFee              Float    @default(0)
-  taxAmount             Float    @default(0)
-  discountAmount        Float    @default(0)
-  totalAmount           Float    @default(0)
+  estimatedCost  Float?
+  materialCost   Float  @default(0)
+  laborFee       Float  @default(0)
+  taxAmount      Float  @default(0)
+  discountAmount Float  @default(0)
+  totalAmount    Float  @default(0)
 
   // Payment tracking
-  paidAmount            Float    @default(0)
-  pendingAmount         Float    @default(0)
+  paidAmount    Float @default(0)
+  pendingAmount Float @default(0)
 
   // Timing
-  scheduledDate         DateTime?
-  startedAt             DateTime?
-  completedAt           DateTime?
-  dueDate               DateTime?
+  scheduledDate DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  dueDate       DateTime?
 
   // Notes
-  notes                 String?
-  clientNotes           String?
-  artisanNotes          String?
+  notes        String?
+  clientNotes  String?
+  artisanNotes String?
 
   // Media
-  images                String[] @default([])
+  images String[] @default([])
 
   // Sync metadata
-  serverVersion         Int      @default(0)
-  deleted               Boolean  @default(false)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
 
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  invoice               Invoice?
-  payments              Payment[]
-  expenseLogs           ExpenseLog[]
+  invoice     Invoice?
+  payments    Payment[]
+  expenseLogs ExpenseLog[]
 
   @@index([artisanId])
   @@index([clientId])
+  @@index([customerId])
   @@index([status])
   @@index([updatedAt])
 }
@@ -189,55 +235,55 @@ model Job {
 // ============================================================================
 
 model Invoice {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // References
-  jobId                 String   @unique
-  job                   Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId String @unique
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  artisanId             String
-  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+  artisanId String
+  artisan   User   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
 
   // Invoice metadata
-  invoiceNumber         String   @unique
+  invoiceNumber String @unique
 
   // Line items
-  items                 InvoiceItem[]
+  items InvoiceItem[]
 
   // Totals
-  subtotal              Float    @default(0)
-  taxRate               Float    @default(0.075)
-  taxAmount             Float    @default(0)
-  discountAmount        Float    @default(0)
-  totalAmount           Float    @default(0)
+  subtotal       Float @default(0)
+  taxRate        Float @default(0.075)
+  taxAmount      Float @default(0)
+  discountAmount Float @default(0)
+  totalAmount    Float @default(0)
 
   // Payment tracking
-  amountPaid            Float    @default(0)
-  amountDue             Float    @default(0)
+  amountPaid Float @default(0)
+  amountDue  Float @default(0)
 
   // Status
-  status                String   @default("draft") // draft, sent, viewed, accepted, paid
-  paidStatus            String   @default("unpaid") // unpaid, partially_paid, paid
+  status     String @default("draft") // draft, sent, viewed, accepted, paid
+  paidStatus String @default("unpaid") // unpaid, partially_paid, paid
 
   // Dates
-  issuedAt              DateTime @default(now())
-  dueDate               DateTime?
-  paidAt                DateTime?
+  issuedAt DateTime  @default(now())
+  dueDate  DateTime?
+  paidAt   DateTime?
 
   // Notes
-  notes                 String?
-  paymentTerms          String?
+  notes        String?
+  paymentTerms String?
 
   // Sync metadata
-  serverVersion         Int      @default(0)
-  deleted               Boolean  @default(false)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
 
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  payments              Payment[]
+  payments Payment[]
 
   @@index([artisanId])
   @@index([jobId])
@@ -250,22 +296,22 @@ model Invoice {
 // ============================================================================
 
 model InvoiceItem {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  invoiceId             String
-  invoice               Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   // Item details
-  description           String
-  quantity              Float
-  unitPrice             Float
-  amount                Float
+  description String
+  quantity    Float
+  unitPrice   Float
+  amount      Float
 
   // Classification
-  category              String // material, labor, service
+  category String // material, labor, service
 
   // Timestamps
-  createdAt             DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([invoiceId])
 }
@@ -275,43 +321,46 @@ model InvoiceItem {
 // ============================================================================
 
 model Payment {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // References
-  invoiceId             String?
-  invoice               Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  jobId                 String?
-  job                   Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobId String?
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
-  artisanId             String
-  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+  artisanId String
+  artisan   User   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   // Details
-  amount                Float
-  method                PaymentMethod
-  status                PaymentStatus @default(PENDING)
+  amount Float
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
 
   // References
-  transactionId         String?
-  receiptNumber         String?
-  paystackTransferId    String?
+  transactionId      String?
+  receiptNumber      String?
+  paystackTransferId String?
 
   // Proof
-  proofOfPayment        String?
-  notes                 String?
+  proofOfPayment String?
+  notes          String?
 
   // Dates
-  paidAt                DateTime?
-  recordedAt            DateTime @default(now())
+  paidAt     DateTime?
+  recordedAt DateTime  @default(now())
 
   // Sync metadata
-  serverVersion         Int      @default(0)
-  deleted               Boolean  @default(false)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
 
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([artisanId])
   @@index([invoiceId])
@@ -325,35 +374,35 @@ model Payment {
 // ============================================================================
 
 model ExpenseLog {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  artisanId             String
-  artisan               User     @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+  artisanId String
+  artisan   User   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
 
   // Details
-  category              ExpenseCategory
-  description           String
-  amount                Float
+  category    ExpenseCategory
+  description String
+  amount      Float
 
   // Timing
-  expenseDate           DateTime
-  recordedAt            DateTime @default(now())
+  expenseDate DateTime
+  recordedAt  DateTime @default(now())
 
   // Optional job link
-  jobId                 String?
-  job                   Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobId String?
+  job   Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   // Notes
-  notes                 String?
-  receipt               String?
+  notes   String?
+  receipt String?
 
   // Sync metadata
-  serverVersion         Int      @default(0)
-  deleted               Boolean  @default(false)
+  serverVersion Int     @default(0)
+  deleted       Boolean @default(false)
 
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([artisanId])
   @@index([expenseDate])
@@ -365,35 +414,66 @@ model ExpenseLog {
 // ============================================================================
 
 model SyncLog {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Sync metadata
-  artisanId             String?  // Which artisan's data was synced
-  operation             String   // "push", "pull", "conflict_resolved"
+  artisanId String? // Which artisan's data was synced
+  operation String // "push", "pull", "conflict_resolved"
 
   // Change details
-  entityType            String?  // "job", "invoice", "payment", etc.
-  entityId              String?
-  clientVersion         Int?
-  serverVersion         Int?
+  entityType    String? // "job", "invoice", "payment", etc.
+  entityId      String?
+  clientVersion Int?
+  serverVersion Int?
 
   // Conflict info (if applicable)
-  hadConflict           Boolean  @default(false)
-  conflictResolution    String?  // "server-wins", "merged", etc.
+  hadConflict        Boolean @default(false)
+  conflictResolution String? // "server-wins", "merged", etc.
 
   // Request/Response
-  requestSize           Int?     // Bytes
-  responseSize          Int?     // Bytes
+  requestSize  Int? // Bytes
+  responseSize Int? // Bytes
 
   // Status
-  success               Boolean  @default(true)
-  error                 String?
+  success Boolean @default(true)
+  error   String?
 
   // Timestamps
-  createdAt             DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([artisanId])
   @@index([entityType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PROCESSED OPERATIONS TABLE (for sync idempotency)
+// ============================================================================
+
+model ProcessedOperation {
+  id String @id @default(cuid())
+
+  // Operation idempotency key (stable from mobile client)
+  operationId String
+  artisanId   String
+
+  // Entity metadata
+  entityType String // 'customers', 'jobs', etc.
+  entityId   String
+
+  // Operation details
+  operation     String // 'create', 'update', 'archive', 'restore'
+  serverVersion Int
+
+  // Cached result to avoid re-execution
+  result Json?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@unique([operationId, artisanId])
+  @@index([artisanId])
+  @@index([entityId])
   @@index([createdAt])
 }
 
@@ -402,18 +482,18 @@ model SyncLog {
 // ============================================================================
 
 model ProcessedWebhook {
-  id                    String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Webhook reference (unique per Paystack webhook)
-  paystackReference     String   @unique
+  paystackReference String @unique
 
   // Event tracking
-  event                 String   // "charge.success", "transfer.success", etc.
-  payloadHash           String   // SHA256 hash of payload for verification
+  event       String // "charge.success", "transfer.success", etc.
+  payloadHash String // SHA256 hash of payload for verification
 
   // Timestamps
-  processedAt           DateTime @default(now())
-  retryCount            Int      @default(0)
+  processedAt DateTime @default(now())
+  retryCount  Int      @default(0)
 
   @@index([paystackReference])
   @@index([event])

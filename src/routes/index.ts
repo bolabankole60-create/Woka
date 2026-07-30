@@ -7,6 +7,14 @@
 import { Application } from 'express';
 import { handleSync } from '../controllers/syncController';
 import { handlePaystackWebhook } from '../controllers/paymentWebhookController';
+import {
+  listCustomers,
+  getCustomer,
+  createCustomer,
+  updateCustomer,
+  archiveCustomer,
+  restoreCustomer,
+} from '../controllers/customerController';
 import { verifyPaystackSignature, validatePaystackEvent } from '../middleware/paystackAuth';
 import { asyncHandler } from '../middleware/errorHandler';
 
@@ -66,6 +74,17 @@ export function setupRoutes(app: Application): void {
     validatePaystackEvent,
     handlePaystackWebhook,
   );
+
+  // ============================================================================
+  // CUSTOMERS ROUTES (Phase 2A)
+  // ============================================================================
+
+  app.get('/api/v1/customers', listCustomers);
+  app.get('/api/v1/customers/:id', getCustomer);
+  app.post('/api/v1/customers', createCustomer);
+  app.patch('/api/v1/customers/:id', updateCustomer);
+  app.post('/api/v1/customers/:id/archive', archiveCustomer);
+  app.post('/api/v1/customers/:id/restore', restoreCustomer);
 
   // ============================================================================
   // JOBS ROUTES

@@ -71,6 +71,7 @@
     "jest-expo": "^51.0.1",
     "prettier": "^3.0.3",
     "prisma": "^5.22.0",
+    "ts-jest": "^29.4.12",
     "typescript": "^5.9.3"
   },
   "private": true,

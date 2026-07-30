@@ -212,6 +212,9 @@ async function processOperation(
       case 'expenseLogs':
         return await handleExpenseOperation(tx, operation, id, clientVersion, data, baseResult);
 
+      case 'customers':
+        return await handleCustomerOperation(tx, operation, id, clientVersion, data, baseResult);
+
       default:
         return {
           ...baseResult,
@@ -603,6 +606,261 @@ async function handleExpenseOperation(
   return { ...baseResult, success: false, error: 'Invalid operation' };
 }
 
+/**
+ * Handle customer operations (Phase 2A)
+ * Supports: create, update, archive, restore
+ * Enforces: ownership (artisanId), version conflicts, phone uniqueness
+ * Idempotency: Stable operation IDs prevent duplicate execution
+ */
+async function handleCustomerOperation(
+  tx: any,
+  operation: string,
+  id: string,
+  clientVersion: number,
+  data: Record<string, any>,
+  baseResult: SyncResult
+): Promise<SyncResult> {
+  // Get authenticated user (artisan) ID from request context
+  const artisanId = (baseResult as any).artisanId;
+  if (!artisanId) {
+    return { ...baseResult, success: false, error: 'Not authenticated' };
+  }
+
+  // Require stable operation ID from mobile client (no fallback)
+  const operationId = (baseResult as any).operationId;
+  if (!operationId || typeof operationId !== 'string' || operationId.length === 0) {
+    return {
+      ...baseResult,
+      success: false,
+      error: 'Missing or invalid operationId',
+    };
+  }
+
+  // Idempotency check: Has this exact operation already been processed?
+  const processed = await tx.processedOperation.findUnique({
+    where: {
+      operationId_artisanId: {
+        operationId,
+        artisanId,
+      },
+    },
+  });
+
+  if (processed) {
+    logger.debug(
+      `[Sync] Duplicate operation ${operationId} for artisan ${artisanId} - returning cached result v${processed.serverVersion}`
+    );
+    return {
+      ...baseResult,
+      serverVersion: processed.serverVersion,
+      success: true,
+      serverData: processed.result,
+    };
+  }
+
+  if (operation === 'create') {
+    try {
+      // Check for duplicate normalized phone within artisan's customers
+      if (data.normalized_phone) {
+        const duplicate = await tx.customer.findUnique({
+          where: {
+            artisanId_normalizedPhone: {
+              artisanId,
+              normalizedPhone: data.normalized_phone,
+            },
+          },
+        } as any);
+
+        if (duplicate) {
+          return {
+            ...baseResult,
+            success: false,
+            error: 'A customer with this phone number already exists',
+          };
+        }
+      }
+
+      await tx.customer.create({
+        data: {
+          id,
+          artisanId,
+          ...data,
+          serverVersion: 1,
+        },
+      });
+
+      // Save processed operation for idempotency
+      await tx.processedOperation.upsert({
+        where: { operationId_artisanId: { operationId, artisanId } },
+        update: { serverVersion: 1 },
+        create: {
+          operationId,
+          artisanId,
+          entityType: 'customers',
+          entityId: id,
+          operation: 'create',
+          serverVersion: 1,
+        },
+      });
+
+      return { ...baseResult, serverVersion: 1 };
+    } catch (error) {
+      return {
+        ...baseResult,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create customer',
+      };
+    }
+  }
+
+  if (operation === 'update') {
+    const existing = await tx.customer.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Customer not found' };
+    }
+
+    // Verify ownership
+    if (existing.artisanId !== artisanId) {
+      return { ...baseResult, success: false, error: 'Access denied' };
+    }
+
+    // Server-wins conflict resolution
+    if (clientVersion < existing.serverVersion) {
+      return {
+        ...baseResult,
+        conflict: true,
+        serverVersion: existing.serverVersion,
+        serverData: existing,
+      };
+    }
+
+    // Check for duplicate phone if updating
+    if (data.normalized_phone && data.normalized_phone !== existing.normalizedPhone) {
+      const duplicate = await tx.customer.findUnique({
+        where: {
+          artisanId_normalizedPhone: {
+            artisanId,
+            normalizedPhone: data.normalized_phone,
+          },
+        },
+      } as any);
+
+      if (duplicate) {
+        return {
+          ...baseResult,
+          success: false,
+          error: 'A customer with this phone number already exists',
+        };
+      }
+    }
+
+    const updated = await tx.customer.update({
+      where: { id },
+      data: {
+        ...data,
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Save processed operation for idempotency
+    await tx.processedOperation.upsert({
+      where: { operationId_artisanId: { operationId, artisanId } },
+      update: { serverVersion: updated.serverVersion, result: updated },
+      create: {
+        operationId,
+        artisanId,
+        entityType: 'customers',
+        entityId: id,
+        operation: 'update',
+        serverVersion: updated.serverVersion,
+        result: updated,
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion, serverData: updated };
+  }
+
+  if (operation === 'archive') {
+    const existing = await tx.customer.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Customer not found' };
+    }
+
+    if (existing.artisanId !== artisanId) {
+      return { ...baseResult, success: false, error: 'Access denied' };
+    }
+
+    const updated = await tx.customer.update({
+      where: { id },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    await tx.processedOperation.upsert({
+      where: { operationId_artisanId: { operationId, artisanId } },
+      update: { serverVersion: updated.serverVersion, result: updated },
+      create: {
+        operationId,
+        artisanId,
+        entityType: 'customers',
+        entityId: id,
+        operation: 'archive',
+        serverVersion: updated.serverVersion,
+        result: updated,
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion, serverData: updated };
+  }
+
+  if (operation === 'restore') {
+    const existing = await tx.customer.findUnique({ where: { id } });
+
+    if (!existing) {
+      return { ...baseResult, success: false, error: 'Customer not found' };
+    }
+
+    if (existing.artisanId !== artisanId) {
+      return { ...baseResult, success: false, error: 'Access denied' };
+    }
+
+    const updated = await tx.customer.update({
+      where: { id },
+      data: {
+        isArchived: false,
+        archivedAt: null,
+        serverVersion: existing.serverVersion + 1,
+        updatedAt: new Date(),
+      },
+    });
+
+    await tx.processedOperation.upsert({
+      where: { operationId_artisanId: { operationId, artisanId } },
+      update: { serverVersion: updated.serverVersion, result: updated },
+      create: {
+        operationId,
+        artisanId,
+        entityType: 'customers',
+        entityId: id,
+        operation: 'restore',
+        serverVersion: updated.serverVersion,
+        result: updated,
+      },
+    });
+
+    return { ...baseResult, serverVersion: updated.serverVersion, serverData: updated };
+  }
+
+  return { ...baseResult, success: false, error: 'Invalid operation' };
+}
+
 // ============================================================================
 // DELTA SYNC
 // ============================================================================
@@ -618,7 +876,7 @@ async function getPullChanges(lastSyncDate: Date): Promise<PullChanges> {
   try {
     // Fetch updated records from each table
     // Only return non-deleted records
-    const [users, jobs, invoices, payments, expenses] = await Promise.all([
+    const [users, jobs, invoices, payments, expenses, customers] = await Promise.all([
       prisma.user.findMany({
         where: {
           AND: [{ updatedAt: { gt: lastSyncDate } }, { deleted: false }],
@@ -645,6 +903,11 @@ async function getPullChanges(lastSyncDate: Date): Promise<PullChanges> {
           AND: [{ updatedAt: { gt: lastSyncDate } }, { deleted: false }],
         },
       }),
+      prisma.customer.findMany({
+        where: {
+          AND: [{ updatedAt: { gt: lastSyncDate } }, { deleted: false }],
+        },
+      }),
     ]);
 
     if (users.length > 0) pullChanges.users = users;
@@ -652,6 +915,7 @@ async function getPullChanges(lastSyncDate: Date): Promise<PullChanges> {
     if (invoices.length > 0) pullChanges.invoices = invoices;
     if (payments.length > 0) pullChanges.payments = payments;
     if (expenses.length > 0) pullChanges.expenseLogs = expenses;
+    if (customers.length > 0) pullChanges.customers = customers;
 
     logger.debug(
       `[Sync] Pull changes: ${JSON.stringify(Object.keys(pullChanges).map((k) => `${k}(${pullChanges[k].length})`))}`,

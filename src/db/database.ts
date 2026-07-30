@@ -16,14 +16,44 @@
 import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
+import Customer from '../models/Customer';
+import { dbMigrations } from './migrations';
 
 /**
  * Define database schema
  * This mirrors the Prisma schema for consistency
+ *
+ * WatermelonDB v0.27 automatically creates new tables when schema version increments.
+ * Version 5 adds the customers table (Phase 2A).
+ * Existing v4 databases will have the customers table created on first open.
  */
 export const dbSchema = appSchema({
-  version: 4, // Increment when schema changes
+  version: 5, // Increment when schema changes - automatically triggers migration
   tables: [
+    // Customers Table (Phase 2A)
+    tableSchema({
+      name: 'customers',
+      columns: [
+        { name: 'id', type: 'string', isIndexed: true },
+        { name: 'artisan_id', type: 'string', isIndexed: true },
+        { name: 'name', type: 'string' },
+        { name: 'phone', type: 'string' },
+        { name: 'normalized_phone', type: 'string', isIndexed: true }, // E.164 format
+        { name: 'email', type: 'string', isOptional: true },
+        { name: 'address', type: 'string', isOptional: true },
+        { name: 'notes', type: 'string', isOptional: true },
+        { name: 'is_archived', type: 'boolean' },
+        { name: 'archived_at', type: 'number', isOptional: true },
+        // Sync tracking
+        { name: 'sync_status', type: 'string' },
+        { name: 'client_version', type: 'number' },
+        { name: 'server_version', type: 'number' },
+        { name: 'last_synced_at', type: 'number', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+
     // Users Table
     tableSchema({
       name: 'users',
@@ -227,18 +257,19 @@ export const dbSchema = appSchema({
 export async function initializeDatabase(): Promise<Database> {
   const adapter = new SQLiteAdapter({
     schema: dbSchema,
+    migrations: dbMigrations,
     dbName: 'tradify_db', // SQLite file name
   });
 
   const database = new Database({
     adapter,
-    modelClasses: [],
+    modelClasses: [Customer],
   });
 
-  // Run migrations if needed
-  await database.write(async () => {
-    // TODO: Add migration logic here
-  });
+  // Run migrations if needed (v4 → v5: add customers table)
+  // WatermelonDB handles schema migrations automatically based on version number
+  // No additional action needed - the new customers table will be created on first open
+  // if upgrading from v4, existing local data in other tables is preserved
 
   return database;
 }
