@@ -412,7 +412,7 @@ export async function archiveJobEndpoint(req: AuthenticatedRequest, res: Respons
     }
 
     const archiveData: any = {
-      archivedAt: new Date(),
+      isArchived: true,
       serverVersion: job.serverVersion + 1,
       updatedAt: new Date(),
     };
@@ -471,7 +471,7 @@ export async function restoreJobEndpoint(req: AuthenticatedRequest, res: Respons
     }
 
     const restoreData: any = {
-      archivedAt: null,
+      isArchived: false,
       serverVersion: job.serverVersion + 1,
       updatedAt: new Date(),
     };

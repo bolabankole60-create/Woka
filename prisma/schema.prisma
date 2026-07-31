@@ -181,8 +181,9 @@ model Job {
   location    String
 
   // Status
-  status   JobStatus @default(DRAFT)
-  priority String?
+  status     JobStatus @default(DRAFT)
+  isArchived Boolean   @default(false)
+  priority   String?
 
   // Costs
   estimatedCost  Float?

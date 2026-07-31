@@ -521,7 +521,7 @@ describeIfDB('Job Controller Integration Tests', () => {
         .set('Authorization', `Bearer ${token1}`)
         .expect(200);
 
-      expect(response.body.data.archivedAt).toBeTruthy();
+      expect(response.body.data.isArchived).toBe(true);
       expect(response.body.data.serverVersion).toBe(2);
     });
 
@@ -535,7 +535,7 @@ describeIfDB('Job Controller Integration Tests', () => {
         .set('Authorization', `Bearer ${token1}`)
         .expect(200);
 
-      expect(response.body.data.archivedAt).toBeNull();
+      expect(response.body.data.isArchived).toBe(false);
     });
 
     it('should reject archive/restore by non-owner', async () => {
