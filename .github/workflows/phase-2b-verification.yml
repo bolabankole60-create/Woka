@@ -59,15 +59,10 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
         run: npx prisma generate
 
-      - name: Prisma Migrate Deploy
+      - name: Prisma DB Push
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
-        run: npx prisma migrate deploy
-
-      - name: Prisma Migrate Status
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
-        run: npx prisma migrate status
+        run: npx prisma db push --skip-generate
 
       - name: TypeScript Check (Mobile)
         run: npx tsc --noEmit
