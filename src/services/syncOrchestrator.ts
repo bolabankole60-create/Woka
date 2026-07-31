@@ -7,14 +7,13 @@
  * 3. Fetch pull delta → pull changed data
  * 4. Reconcile pull changes → merge into WatermelonDB
  * 5. Advance cursor → only after successful reconciliation
+ *
+ * Supports dependency injection for testing while maintaining single production implementation.
  */
 
 import { Database } from '@nozbe/watermelondb';
-import { apiClient } from './api';
-import { reconcilePullChanges, reconcilePushResult } from './syncService';
-import * as SecureStore from 'expo-secure-store';
 
-interface SyncResult {
+export interface SyncResult {
   success: boolean;
   pushedCount: number;
   pulledCount: number;
@@ -22,21 +21,55 @@ interface SyncResult {
   errors: string[];
 }
 
+export interface SyncBoundaries {
+  database: Database;
+  apiClient: any;
+  secureStore: any;
+  reconcilePullChanges?: (db: Database, response: any) => Promise<void>;
+  reconcilePushResult?: (db: Database, entityId: string, result: any) => Promise<void>;
+}
+
 let syncInProgress = false;
 let syncPromise: Promise<SyncResult> | null = null;
+
+// Production defaults (lazy-loaded to avoid React Native import issues in tests)
+let productionApiClient: any = null;
+let productionSecureStore: any = null;
+
+function getProductionApiClient() {
+  if (!productionApiClient) {
+    productionApiClient = require('./api').apiClient;
+  }
+  return productionApiClient;
+}
+
+function getProductionSecureStore() {
+  if (!productionSecureStore) {
+    productionSecureStore = require('expo-secure-store');
+  }
+  return productionSecureStore;
+}
+
+function getProductionReconcileFunctions() {
+  return require('./syncService');
+}
 
 /**
  * Execute complete bi-directional sync
  * Prevents concurrent syncs with in-flight promise caching
+ * Supports optional dependency injection for testing
  */
-export async function performSync(database: Database): Promise<SyncResult> {
+export async function performSync(
+  database: Database,
+  boundaries?: Partial<SyncBoundaries>
+): Promise<SyncResult> {
   // Prevent concurrent syncs
   if (syncInProgress) {
     return syncPromise || Promise.reject(new Error('Sync already in progress'));
   }
 
   syncInProgress = true;
-  syncPromise = executeSyncCycle(database);
+  syncPromise = executeSyncCycle(database, boundaries);
 
   try {
     const result = await syncPromise;
@@ -49,8 +82,12 @@ export async function performSync(database: Database): Promise<SyncResult> {
 
 /**
  * Execute one complete sync cycle
+ * Accepts optional boundary overrides for testing
  */
-async function executeSyncCycle(database: Database): Promise<SyncResult> {
+async function executeSyncCycle(
+  database: Database,
+  boundaries?: Partial<SyncBoundaries>
+): Promise<SyncResult> {
   const result: SyncResult = {
     success: true,
     pushedCount: 0,
@@ -60,23 +97,36 @@ async function executeSyncCycle(database: Database): Promise<SyncResult> {
   };
 
   try {
+    // Resolve boundaries: use provided overrides or production defaults
+    const productionFuncs = getProductionReconcileFunctions();
+    const resolvedBoundaries: SyncBoundaries = {
+      database,
+      apiClient: boundaries?.apiClient || getProductionApiClient(),
+      secureStore: boundaries?.secureStore || getProductionSecureStore(),
+      reconcilePullChanges: boundaries?.reconcilePullChanges || productionFuncs.reconcilePullChanges,
+      reconcilePushResult: boundaries?.reconcilePushResult || productionFuncs.reconcilePushResult,
+    };
+
     // Get last successful sync cursor
-    const lastSyncCursorStr = await SecureStore.getItemAsync('lastSyncCursor');
+    const lastSyncCursorStr = await resolvedBoundaries.secureStore.getItemAsync('lastSyncCursor');
     let lastSyncCursor = parseInt(lastSyncCursorStr || '0');
 
     // Step 1: PUSH - Process pending operation queue
-    result.pushedCount = await pushPendingOperations(database);
+    result.pushedCount = await pushPendingOperations(resolvedBoundaries);
 
     // Step 2: PULL - Fetch delta changes
-    const pullResponse = await apiClient.deltaSync(lastSyncCursor);
+    const pullResponse = await resolvedBoundaries.apiClient.deltaSync(lastSyncCursor);
 
     // Step 3: RECONCILE PULL - Merge customers and jobs into WatermelonDB
     try {
-      await reconcilePullChanges(database, pullResponse);
+      await resolvedBoundaries.reconcilePullChanges!(resolvedBoundaries.database, pullResponse);
       result.pulledCount = (pullResponse.customers?.length || 0) + (pullResponse.jobs?.length || 0);
 
       // Step 4: SAVE CURSOR - Only after successful reconciliation
-      await SecureStore.setItemAsync('lastSyncCursor', pullResponse.serverTimestamp.toString());
+      await resolvedBoundaries.secureStore.setItemAsync(
+        'lastSyncCursor',
+        pullResponse.serverTimestamp.toString()
+      );
     } catch (error) {
       result.errors.push(`Pull reconciliation failed: ${String(error)}`);
       result.success = false;
@@ -95,9 +145,10 @@ async function executeSyncCycle(database: Database): Promise<SyncResult> {
 /**
  * Process pending operation queue
  * Returns count of successfully pushed operations
+ * Accepts boundary for dependency injection in tests
  */
-async function pushPendingOperations(database: Database): Promise<number> {
-  const queueCollection = database.get('operation_queue');
+async function pushPendingOperations(boundaries: SyncBoundaries): Promise<number> {
+  const queueCollection = boundaries.database.get('operation_queue');
   const pending = await queueCollection.query().fetch();
 
   if (pending.length === 0) {
@@ -124,7 +175,7 @@ async function pushPendingOperations(database: Database): Promise<number> {
 
   try {
     // Push all operations to backend
-    const results = await apiClient.syncOperations(operations);
+    const results = await boundaries.apiClient.syncOperations(operations);
 
     // Process each result and reconcile
     for (let i = 0; i < results.length; i++) {
@@ -133,7 +184,7 @@ async function pushPendingOperations(database: Database): Promise<number> {
 
       if (!result.success) {
         // Increment retry count and save error
-        await database.write(async () => {
+        await boundaries.database.write(async () => {
           await op.update((o: any) => {
             o.retry_count = (o.retry_count || 0) + 1;
             o.last_error = result.error || 'Unknown error';
@@ -148,22 +199,24 @@ async function pushPendingOperations(database: Database): Promise<number> {
       // Successful push - reconcile locally
       try {
         const raw = op._raw as Record<string, any>;
-        await reconcilePushResult(database, raw.entity_id, {
-          success: true,
-          serverVersion: result.serverVersion,
-          serverData: result.data,
-          conflict: result.conflict,
-        });
+        if (boundaries.reconcilePushResult) {
+          await boundaries.reconcilePushResult(boundaries.database, raw.entity_id, {
+            success: true,
+            serverVersion: result.serverVersion,
+            serverData: result.data,
+            conflict: result.conflict,
+          });
+        }
 
         // Remove from queue only after successful local reconciliation
-        await database.write(async () => {
+        await boundaries.database.write(async () => {
           await op.destroyPermanently();
         });
 
         pushedCount++;
       } catch (error) {
         // Keep in queue on reconciliation failure
-        await database.write(async () => {
+        await boundaries.database.write(async () => {
           await op.update((o: any) => {
             o.last_error = String(error);
           });
