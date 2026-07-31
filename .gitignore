@@ -40,7 +40,6 @@ ios/Podfile.lock
 .ruby-version
 
 # Prisma
-prisma/migrations/
 .prisma/
 
 # Logs
