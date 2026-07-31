@@ -1,215 +1,243 @@
 /**
- * Real Sync Integration Tests
- * Tests actual sync orchestrator behavior with mocked boundaries
+ * Sync Orchestrator Integration Tests
+ *
+ * Architecture Constraint:
+ * The sync orchestrator requires WatermelonDB (React Native only) and expo-secure-store (ESM module).
+ * These dependencies cannot be instantiated in Node Jest environment.
+ *
+ * These tests describe the behavioral contracts the sync orchestrator must fulfill
+ * when integrated with a real WatermelonDB application. They are marked as skipped
+ * because the required dependencies cannot be loaded in Node Jest.
+ *
+ * To test these behaviors:
+ * 1. Use React Native testing library with native module mocks
+ * 2. Or use end-to-end tests with real mobile app instance
+ * 3. Or mock the entire WatermelonDB and SecureStore layer
+ *
+ * Current approach: Document the contracts. Implement integration tests when
+ * React Native test infrastructure is available.
  */
 
 describe('Sync Orchestrator Integration Tests', () => {
-  /**
-   * Note: Full sync orchestrator integration tests require:
-   * - Real WatermelonDB database instance
-   * - expo-secure-store mocking (ESM module not compatible with Jest Node environment)
-   * - Network layer mocking (apiClient)
-   * - Transaction support in InMemoryDatabase
-   *
-   * These tests verify the sync orchestrator's:
-   * 1. Concurrent sync prevention
-   * 2. Cursor management (advance on success, preserve on failure)
-   * 3. Operation queue processing (push, reconcile, remove/retain)
-   * 4. Error handling (network, reconciliation, validation)
-   * 5. State management (isSyncInProgress, resetSyncState)
-   *
-   * CI Environment Setup Required:
-   * - Full WatermelonDB with LokiJS or SQLite adapter
-   * - SecureStore mock via native module mocking
-   * - PostgreSQL for API endpoint testing
-   */
-
   describe('Concurrent Sync Prevention', () => {
-    it('should prevent overlapping sync operations', () => {
-      // Verification: performSync() uses syncInProgress flag
-      // When sync starts, flag is set to true
-      // When sync completes, flag is set to false
-      // Concurrent calls return cachedPromise
-      expect(true).toBe(true);
+    it.skip('should prevent overlapping sync operations - requires WatermelonDB runtime', () => {
+      // Contract: performSync() returns cached promise when syncInProgress = true
+      // Test: Call performSync() twice in quick succession
+      // Verify: Both calls return identical Promise instance
+      // Requires: WatermelonDB database, expo-secure-store
     });
 
-    it('should return cached promise on concurrent sync attempt', () => {
-      // Verification: performSync() caches syncPromise
-      // Concurrent calls receive same promise
-      expect(true).toBe(true);
+    it.skip('should return cached promise on concurrent sync attempt - requires WatermelonDB runtime', () => {
+      // Contract: syncPromise is cached during sync execution
+      // Test: Concurrent calls to performSync() during active sync
+      // Verify: All concurrent calls receive same promise
+      // Requires: WatermelonDB database, real async execution
     });
   });
 
   describe('Operation Queue Processing', () => {
-    it('should fetch pending operations from queue collection', () => {
-      // Verification: pushPendingOperations() queries operation_queue
-      // Returns operations with id, operationId, entityType, entityId, operation, clientVersion, changes, retryCount
-      expect(true).toBe(true);
+    it.skip('should fetch pending operations from queue collection - requires WatermelonDB runtime', () => {
+      // Contract: pushPendingOperations() queries operation_queue collection
+      // Test: Create operations with various retry counts
+      // Verify: Returns array with correct operation structure
+      // Expected fields: id, operationId, entityType, entityId, operation, clientVersion, changes, retryCount
+      // Requires: WatermelonDB database instance, operation_queue collection
     });
 
-    it('should increment retry count on push failure', () => {
-      // Verification: If apiClient.syncOperations() returns !success
-      // Operation retry_count += 1
-      // If retry_count >= 3, status = 'failed'
-      expect(true).toBe(true);
+    it.skip('should increment retry count on push failure - requires WatermelonDB runtime', () => {
+      // Contract: On apiClient.syncOperations() failure, operation.retry_count += 1
+      // Contract: When retry_count >= 3, operation status = 'failed'
+      // Test: Mock apiClient.syncOperations() to return failure, call performSync()
+      // Verify: Operation record has retry_count updated, status changed when max retries reached
+      // Requires: WatermelonDB write transaction, Operation model
     });
 
-    it('should reconcile successful push results locally', () => {
-      // Verification: On successful push, calls reconcilePushResult()
-      // Passes: database, entityId, { success, serverVersion, serverData, conflict }
-      expect(true).toBe(true);
+    it.skip('should reconcile successful push results locally - requires WatermelonDB runtime', () => {
+      // Contract: performSync() calls reconcilePushResult() with { success, serverVersion, serverData, conflict }
+      // Test: Mock successful push, verify reconcilePushResult() called with correct params
+      // Verify: Local record updated with server values
+      // Requires: WatermelonDB transaction, record updates
     });
 
-    it('should remove operation from queue only after successful reconciliation', () => {
-      // Verification: After reconcilePushResult() succeeds
-      // Only then: op.destroyPermanently()
-      // If reconciliation fails, operation retained with error
-      expect(true).toBe(true);
+    it.skip('should remove operation from queue only after successful reconciliation - requires WatermelonDB runtime', () => {
+      // Contract: After successful push reconciliation, operation.destroyPermanently()
+      // Contract: If reconciliation fails, operation retained with error metadata
+      // Test: Mock push success, verify operation removed; mock reconciliation failure, verify operation retained
+      // Requires: WatermelonDB destroyPermanently(), transaction support
     });
 
-    it('should return count of pushed operations', () => {
-      // Verification: pushPendingOperations() returns number
-      // Count incremented for each successful push + reconciliation
-      expect(true).toBe(true);
+    it.skip('should return count of pushed operations - requires WatermelonDB runtime', () => {
+      // Contract: pushPendingOperations() returns number = count of successful push + reconciliation
+      // Test: Create N operations, mock successful push/reconciliation, verify count = N
+      // Requires: WatermelonDB operations, real push cycle
     });
   });
 
   describe('Push Reconciliation', () => {
-    it('should reconcile server version from push result', () => {
-      // Verification: reconcilePushResult() updates local record.serverVersion
-      expect(true).toBe(true);
+    it.skip('should reconcile server version from push result - requires WatermelonDB runtime', () => {
+      // Contract: reconcilePushResult() updates local record.serverVersion from server response
+      // Test: Create record with serverVersion=1, mock push with serverVersion=2
+      // Verify: Local record updated to serverVersion=2
+      // Requires: WatermelonDB write transaction
     });
 
-    it('should apply server-wins conflict resolution', () => {
-      // Verification: When conflict detected, server data overwrites local
-      expect(true).toBe(true);
+    it.skip('should apply server-wins conflict resolution - requires WatermelonDB runtime', () => {
+      // Contract: On conflict detected, server data overwrites all local fields
+      // Test: Create local record with stale data, server returns newer version
+      // Verify: Local record matches server values exactly
+      // Requires: WatermelonDB record model, update transaction
     });
 
-    it('should preserve operation idempotency on retry', () => {
-      // Verification: Retrying same operation doesn't create duplicates
-      // reconcilePushResult() updates existing record, not insert
-      expect(true).toBe(true);
+    it.skip('should preserve operation idempotency on retry - requires WatermelonDB runtime', () => {
+      // Contract: Retrying same operation updates existing record, never creates duplicates
+      // Test: Push operation, reconcile, push again with identical data
+      // Verify: Record count = 1 (not 2), values consistent
+      // Requires: WatermelonDB query for duplicates, multiple push cycles
     });
   });
 
   describe('Pull Synchronization', () => {
-    it('should call deltaSync with last cursor', () => {
-      // Verification: apiClient.deltaSync(lastSyncCursor)
-      // lastSyncCursor from SecureStore.getItemAsync('lastSyncCursor')
-      expect(true).toBe(true);
+    it.skip('should call deltaSync with last cursor - requires expo-secure-store (React Native)', () => {
+      // Contract: performSync() retrieves lastSyncCursor from SecureStore
+      // Contract: Calls apiClient.deltaSync(lastSyncCursor)
+      // Test: Set cursor in SecureStore, mock apiClient, call performSync()
+      // Verify: apiClient.deltaSync() called with correct cursor value
+      // Requires: expo-secure-store (React Native API, not available in Node)
     });
 
-    it('should reconcile pull changes to WatermelonDB', () => {
-      // Verification: reconcilePullChanges() called with database, pullResponse
-      // Updates customers, jobs, invoices, payments from server
-      expect(true).toBe(true);
+    it.skip('should reconcile pull changes to WatermelonDB - requires WatermelonDB runtime', () => {
+      // Contract: performSync() calls reconcilePullChanges(database, pullResponse)
+      // Test: Mock pullResponse with customer, job, invoice data
+      // Verify: Each entity type created/updated in WatermelonDB
+      // Requires: WatermelonDB transaction, schema models
     });
 
-    it('should count pulled records in result', () => {
-      // Verification: pulledCount = customers.length + jobs.length
-      expect(true).toBe(true);
+    it.skip('should count pulled records in result - requires WatermelonDB runtime', () => {
+      // Contract: result.pulledCount = customers.length + jobs.length (visible entities)
+      // Test: Mock pull response with specific counts
+      // Verify: result.pulledCount matches expected total
+      // Requires: WatermelonDB queries, real schema
     });
 
-    it('should be idempotent on repeated pull', () => {
-      // Verification: reconcilePullChanges() updates existing records
-      // Repeated pull with same data doesn't create duplicates
-      expect(true).toBe(true);
+    it.skip('should be idempotent on repeated pull - requires WatermelonDB runtime', () => {
+      // Contract: Repeated pull with same data updates existing records, creates no duplicates
+      // Test: Pull data, pull identical data again
+      // Verify: Record count unchanged, values updated not duplicated
+      // Requires: WatermelonDB query counts, multiple sync cycles
     });
   });
 
   describe('Cursor Management', () => {
-    it('should advance cursor only after successful reconciliation', () => {
-      // Verification: SecureStore.setItemAsync('lastSyncCursor', timestamp)
-      // Called AFTER reconcilePullChanges succeeds
-      // NOT called if reconcilePullChanges throws
-      expect(true).toBe(true);
+    it.skip('should advance cursor only after successful reconciliation - requires expo-secure-store (React Native)', () => {
+      // Contract: SecureStore.setItemAsync('lastSyncCursor', timestamp) called AFTER reconcilePullChanges succeeds
+      // Test: Mock reconciliation success/failure, monitor SecureStore calls
+      // Verify: Cursor updated only on success
+      // Requires: expo-secure-store (React Native API, not available in Node)
     });
 
-    it('should preserve cursor on pull reconciliation failure', () => {
-      // Verification: If reconcilePullChanges() fails
-      // SecureStore.setItemAsync NOT called
-      // result.success = false, result.errors includes error message
-      expect(true).toBe(true);
+    it.skip('should preserve cursor on pull reconciliation failure - requires expo-secure-store (React Native)', () => {
+      // Contract: If reconcilePullChanges() throws, SecureStore NOT updated
+      // Contract: result.success = false, result.errors populated
+      // Test: Mock reconciliation failure, verify SecureStore untouched
+      // Requires: expo-secure-store (React Native API)
     });
 
-    it('should resume sync from last cursor on reconnect', () => {
-      // Verification: On next performSync() after network restore
-      // Retrieves lastSyncCursor from SecureStore
-      // Calls apiClient.deltaSync(cursor)
-      expect(true).toBe(true);
+    it.skip('should resume sync from last cursor on reconnect - requires WatermelonDB + expo-secure-store', () => {
+      // Contract: On next performSync() after network restore, lastSyncCursor retrieved
+      // Test: Simulate offline/online transition, verify cursor retrieved and used
+      // Verify: apiClient.deltaSync() called with previous cursor value
+      // Requires: Both WatermelonDB and expo-secure-store (React Native environment)
     });
   });
 
   describe('Concurrency Control', () => {
-    it('should prevent concurrent sync operations', () => {
-      // Verification: isSyncInProgress() returns true during sync
-      // Second performSync() returns cached promise
-      expect(true).toBe(true);
+    it.skip('should prevent concurrent sync operations - requires WatermelonDB runtime', () => {
+      // Contract: isSyncInProgress() returns true during sync execution
+      // Contract: Second performSync() call returns cached promise
+      // Test: Start sync, verify isSyncInProgress()=true, call performSync() again
+      // Verify: Second call returns same promise
+      // Requires: WatermelonDB to make sync actually async
     });
 
-    it('should allow sync after previous completes', () => {
-      // Verification: After performSync() completes
-      // isSyncInProgress() returns false
-      // Next performSync() executes fresh sync
-      expect(true).toBe(true);
+    it.skip('should allow sync after previous completes - requires WatermelonDB runtime', () => {
+      // Contract: After performSync() resolves, isSyncInProgress() returns false
+      // Contract: Next performSync() executes fresh sync (new promise)
+      // Test: Await first sync, verify isSyncInProgress()=false, start second sync
+      // Verify: Second sync creates new promise
+      // Requires: WatermelonDB, actual async execution
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle network disconnection gracefully', () => {
-      // Verification: If apiClient.deltaSync() throws
-      // Catches error, sets result.success = false
-      // Stores error in result.errors
-      expect(true).toBe(true);
+    it.skip('should handle network disconnection gracefully - requires WatermelonDB runtime', () => {
+      // Contract: If apiClient.deltaSync() throws, error caught
+      // Contract: result.success = false, error message in result.errors
+      // Test: Mock apiClient.deltaSync() to throw network error
+      // Verify: performSync() returns gracefully with error details
+      // Requires: WatermelonDB for full reconciliation attempt
     });
 
-    it('should handle server errors in push', () => {
-      // Verification: If apiClient.syncOperations() returns error results
-      // Increments retry_count, marks as 'failed' after max retries
-      expect(true).toBe(true);
+    it.skip('should handle server errors in push - requires WatermelonDB runtime', () => {
+      // Contract: If apiClient.syncOperations() returns error results, retry_count increments
+      // Contract: After max retries (3), operation status = 'failed'
+      // Test: Mock server error response, call sync multiple times
+      // Verify: retry_count incremented, status updated
+      // Requires: WatermelonDB Operation model, multiple push cycles
     });
 
-    it('should handle validation errors without retry', () => {
-      // Verification: Validation errors (4xx) marked as failed immediately
-      // Network errors (5xx) increment retry count
-      expect(true).toBe(true);
+    it.skip('should handle validation errors without retry - requires WatermelonDB runtime', () => {
+      // Contract: 4xx validation errors marked as 'failed' immediately
+      // Contract: 5xx server errors increment retry_count for retry
+      // Test: Mock 4xx and 5xx responses, verify different handling
+      // Requires: WatermelonDB Operation model, retry logic
     });
 
-    it('should report sync errors in result', () => {
-      // Verification: result.errors array contains error messages
-      // result.success = false if any operation fails
-      expect(true).toBe(true);
+    it.skip('should report sync errors in result - requires WatermelonDB runtime', () => {
+      // Contract: result.errors contains all error messages from sync cycle
+      // Contract: result.success = false if any error occurs
+      // Test: Create failing scenarios, verify error collection
+      // Verify: All errors included, success flag reflects error state
+      // Requires: WatermelonDB error scenarios
     });
   });
 
   describe('Sync State Management', () => {
-    it('should initialize with no sync in progress', () => {
-      // Verification: isSyncInProgress() initially returns false
-      expect(true).toBe(true);
+    it.skip('should initialize with no sync in progress - requires syncOrchestrator import', () => {
+      // Contract: isSyncInProgress() initially returns false
+      // Note: Cannot import syncOrchestrator in Node Jest due to expo-secure-store ESM module
+      // This would test initial state of syncInProgress flag
+      // Requires: isSyncInProgress() function accessible
     });
 
-    it('should reset sync state for testing', () => {
-      // Verification: resetSyncState() sets syncInProgress=false, syncPromise=null
-      // Used in test cleanup
-      expect(true).toBe(true);
+    it.skip('should reset sync state for testing - requires syncOrchestrator import', () => {
+      // Contract: resetSyncState() sets syncInProgress=false, syncPromise=null
+      // Note: Cannot import syncOrchestrator in Node Jest
+      // This would verify state can be reset for test isolation
+      // Requires: resetSyncState() function accessible
     });
   });
 
   describe('Result Reporting', () => {
-    it('should return SyncResult with complete information', () => {
-      // Verification: SyncResult { success, pushedCount, pulledCount, conflicts, errors }
-      expect(true).toBe(true);
+    it.skip('should return SyncResult with complete information - requires WatermelonDB runtime', () => {
+      // Contract: SyncResult contains { success, pushedCount, pulledCount, conflicts, errors }
+      // Test: Execute complete sync cycle, inspect result structure
+      // Verify: All required fields present and correct types
+      // Requires: WatermelonDB for actual sync execution
     });
 
-    it('should count pushed and pulled records', () => {
-      // Verification: pushedCount = operations successfully pushed + reconciled
-      // pulledCount = customers + jobs from pull
-      expect(true).toBe(true);
+    it.skip('should count pushed and pulled records - requires WatermelonDB runtime', () => {
+      // Contract: pushedCount = operations successfully pushed + reconciled
+      // Contract: pulledCount = customers + jobs received in pull
+      // Test: Create operations and mock pull, verify counts
+      // Verify: Counts match expected totals
+      // Requires: WatermelonDB operations and pull reconciliation
     });
 
-    it('should track conflicts in result', () => {
-      // Verification: conflicts count incremented on server-wins resolution
-      expect(true).toBe(true);
+    it.skip('should track conflicts in result - requires WatermelonDB runtime', () => {
+      // Contract: conflicts count incremented when server-wins resolution applied
+      // Test: Create conflict scenario, verify count updated
+      // Verify: result.conflicts reflects number of resolved conflicts
+      // Requires: WatermelonDB conflict scenario creation
     });
   });
 });
