@@ -62,10 +62,24 @@ describeIfDB('Job Controller Integration Tests', () => {
         await prisma.user.deleteMany({});
         // Create test users
         await prisma.user.create({
-          data: { id: artisan1Id, email: 'artisan1@test.com', role: 'ARTISAN' },
+          data: {
+            id: artisan1Id,
+            email: 'artisan1@test.com',
+            role: 'ARTISAN',
+            phone: '08011111111',
+            firstName: 'Artisan',
+            lastName: 'One',
+          },
         });
         await prisma.user.create({
-          data: { id: artisan2Id, email: 'artisan2@test.com', role: 'ARTISAN' },
+          data: {
+            id: artisan2Id,
+            email: 'artisan2@test.com',
+            role: 'ARTISAN',
+            phone: '08022222222',
+            firstName: 'Artisan',
+            lastName: 'Two',
+          },
         });
       } catch {
         // Skip cleanup if database not available
