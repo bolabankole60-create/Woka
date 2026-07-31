@@ -15,7 +15,18 @@ import {
   archiveCustomer,
   restoreCustomer,
 } from '../controllers/customerController';
+import {
+  listJobs,
+  getJob,
+  createJobEndpoint,
+  updateJobEndpoint,
+  completeJobEndpoint,
+  reopenJobEndpoint,
+  archiveJobEndpoint,
+  restoreJobEndpoint,
+} from '../controllers/jobController';
 import { verifyPaystackSignature, validatePaystackEvent } from '../middleware/paystackAuth';
+import { requireAuth } from '../middleware/authMiddleware';
 import { asyncHandler } from '../middleware/errorHandler';
 
 /**
@@ -29,6 +40,7 @@ export function setupRoutes(app: Application): void {
   /**
    * POST /api/v1/sync
    * Handles bi-directional sync for offline-first mobile app
+   * Requires authentication via Bearer token in Authorization header
    *
    * Request:
    * {
@@ -44,7 +56,7 @@ export function setupRoutes(app: Application): void {
    *   "results": [...]
    * }
    */
-  app.post('/api/v1/sync', asyncHandler(handleSync));
+  app.post('/api/v1/sync', requireAuth, asyncHandler(handleSync));
 
   // ============================================================================
   // PAYSTACK WEBHOOK ROUTES
@@ -87,14 +99,17 @@ export function setupRoutes(app: Application): void {
   app.post('/api/v1/customers/:id/restore', restoreCustomer);
 
   // ============================================================================
-  // JOBS ROUTES
+  // JOBS ROUTES (Phase 2B)
   // ============================================================================
 
-  // GET /api/v1/jobs - List jobs (with filtering)
-  // GET /api/v1/jobs/:id - Get single job
-  // POST /api/v1/jobs - Create job
-  // PATCH /api/v1/jobs/:id - Update job
-  // DELETE /api/v1/jobs/:id - Delete job
+  app.get('/api/v1/jobs', requireAuth, asyncHandler(listJobs as any));
+  app.get('/api/v1/jobs/:id', requireAuth, asyncHandler(getJob as any));
+  app.post('/api/v1/jobs', requireAuth, asyncHandler(createJobEndpoint as any));
+  app.patch('/api/v1/jobs/:id', requireAuth, asyncHandler(updateJobEndpoint as any));
+  app.post('/api/v1/jobs/:id/complete', requireAuth, asyncHandler(completeJobEndpoint as any));
+  app.post('/api/v1/jobs/:id/reopen', requireAuth, asyncHandler(reopenJobEndpoint as any));
+  app.post('/api/v1/jobs/:id/archive', requireAuth, asyncHandler(archiveJobEndpoint as any));
+  app.post('/api/v1/jobs/:id/restore', requireAuth, asyncHandler(restoreJobEndpoint as any));
 
   // ============================================================================
   // INVOICES ROUTES

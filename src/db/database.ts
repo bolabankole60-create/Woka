@@ -25,10 +25,12 @@ import { dbMigrations } from './migrations';
  *
  * WatermelonDB v0.27 automatically creates new tables when schema version increments.
  * Version 5 adds the customers table (Phase 2A).
- * Existing v4 databases will have the customers table created on first open.
+ * Version 6 adds customer_id and is_archived to jobs table (Phase 2B).
+ * Version 7 adds invoices, invoice_items, and payments tables for financial tracking (Phase 2B).
+ * Existing v4 databases will be migrated v4→v5→v6→v7 automatically on first open.
  */
 export const dbSchema = appSchema({
-  version: 5, // Increment when schema changes - automatically triggers migration
+  version: 7, // Increment when schema changes - automatically triggers migration
   tables: [
     // Customers Table (Phase 2A)
     tableSchema({
@@ -97,6 +99,7 @@ export const dbSchema = appSchema({
         { name: 'id', type: 'string', isIndexed: true },
         { name: 'artisan_id', type: 'string', isIndexed: true },
         { name: 'client_id', type: 'string', isIndexed: true },
+        { name: 'customer_id', type: 'string', isIndexed: true, isOptional: true },
         { name: 'title', type: 'string' },
         { name: 'description', type: 'string' },
         { name: 'category', type: 'string' },
@@ -119,6 +122,8 @@ export const dbSchema = appSchema({
         { name: 'started_at', type: 'number', isOptional: true },
         { name: 'completed_at', type: 'number', isOptional: true },
         { name: 'due_date', type: 'number', isOptional: true },
+        { name: 'is_archived', type: 'boolean' },
+        { name: 'archived_at', type: 'number', isOptional: true },
         // Sync tracking
         { name: 'sync_status', type: 'string' },
         { name: 'client_version', type: 'number' },

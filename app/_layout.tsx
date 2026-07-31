@@ -18,6 +18,8 @@ import * as SecureStore from 'expo-secure-store';
 
 // Services
 import { initializeAPI } from '@/services/api';
+import { initializeDatabase } from '@/db/database';
+import { useAutomaticSync } from '@/hooks/useSync';
 
 // Types
 interface RootLayoutProps {}
@@ -47,17 +49,22 @@ const queryClient = new QueryClient({
 export const RootLayout: React.FC<RootLayoutProps> = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [db, setDb] = useState<any>(null);
   const router = useRouter();
   const segments = useSegments();
 
   /**
-   * Initialize app: restore tokens, check auth status
+   * Initialize app: restore tokens, check auth status, initialize database
    */
   useEffect(() => {
     const initialize = async () => {
       try {
         // Initialize API client and restore tokens from SecureStore
         await initializeAPI();
+
+        // Initialize WatermelonDB
+        const database = await initializeDatabase();
+        setDb(database);
 
         // Check if we have a valid token
         const token = await SecureStore.getItemAsync('accessToken');
@@ -75,6 +82,11 @@ export const RootLayout: React.FC<RootLayoutProps> = () => {
 
     initialize();
   }, []);
+
+  /**
+   * Mount automatic sync when database is ready and user is authenticated
+   */
+  useAutomaticSync(isAuthenticated ? db : null);
 
   /**
    * Handle routing based on authentication state

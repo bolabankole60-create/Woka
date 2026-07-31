@@ -4,6 +4,7 @@
  */
 
 import { Database } from '@nozbe/watermelondb';
+import { getJobClientVersion, filterJobsByStatus, filterJobsByCustomer } from './watermelonHelpers';
 
 interface CreateJobInput {
   customerId?: string;
@@ -25,6 +26,7 @@ interface UpdateJobInput {
   dueDate?: Date;
   status?: string;
   notes?: string;
+  customerId?: string | null;
 }
 
 export class JobService {
@@ -117,6 +119,7 @@ export class JobService {
           if (input.dueDate !== undefined) j.due_date = input.dueDate?.getTime() || null;
           if (input.status) j.status = input.status;
           if (input.notes !== undefined) j.notes = input.notes;
+          if (input.customerId !== undefined) j.customer_id = input.customerId || null;
           j.sync_status = 'local';
           j.updated_at = Date.now();
         });
@@ -128,7 +131,7 @@ export class JobService {
           op.entity_id = jobId;
           op.operation = 'update';
           op.changes = JSON.stringify(input);
-          op.client_version = (job._raw as any).client_version;
+          op.client_version = getJobClientVersion(job);
           op.retry_count = 0;
           op.max_retries = 3;
           op.status = 'local';
@@ -167,7 +170,7 @@ export class JobService {
           op.entity_id = jobId;
           op.operation = 'complete';
           op.changes = JSON.stringify({ completedAt: new Date() });
-          op.client_version = (job._raw as any).client_version;
+          op.client_version = getJobClientVersion(job);
           op.retry_count = 0;
           op.max_retries = 3;
           op.status = 'local';
@@ -194,15 +197,17 @@ export class JobService {
   async listJobs(filters?: { status?: string; customerId?: string }) {
     try {
       const jobCollection = this.db.get('jobs');
-      const jobs = await jobCollection.query().fetch();
+      let jobs = await jobCollection.query().fetch();
 
-      const filtered = jobs.filter((j: any) => {
-        if (filters?.status && (j._raw as any).status !== filters.status) return false;
-        if (filters?.customerId && (j._raw as any).customer_id !== filters.customerId) return false;
-        return true;
-      });
+      if (filters?.status) {
+        jobs = filterJobsByStatus(jobs, filters.status);
+      }
 
-      return { success: true, data: filtered };
+      if (filters?.customerId) {
+        jobs = filterJobsByCustomer(jobs, filters.customerId);
+      }
+
+      return { success: true, data: jobs };
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -232,7 +237,7 @@ export class JobService {
           op.entity_id = jobId;
           op.operation = 'reopen';
           op.changes = JSON.stringify({ status: 'IN_PROGRESS' });
-          op.client_version = (job._raw as any).client_version;
+          op.client_version = getJobClientVersion(job);
           op.retry_count = 0;
           op.max_retries = 3;
           op.status = 'local';
@@ -258,6 +263,8 @@ export class JobService {
 
       await this.db.write(async () => {
         await job.update((j: any) => {
+          j.is_archived = true;
+          j.archived_at = Date.now();
           j.sync_status = 'local';
           j.updated_at = Date.now();
         });
@@ -269,7 +276,7 @@ export class JobService {
           op.entity_id = jobId;
           op.operation = 'archive';
           op.changes = JSON.stringify({ archived: true });
-          op.client_version = (job._raw as any).client_version;
+          op.client_version = getJobClientVersion(job);
           op.retry_count = 0;
           op.max_retries = 3;
           op.status = 'local';
@@ -295,6 +302,8 @@ export class JobService {
 
       await this.db.write(async () => {
         await job.update((j: any) => {
+          j.is_archived = false;
+          j.archived_at = null;
           j.sync_status = 'local';
           j.updated_at = Date.now();
         });
@@ -306,7 +315,7 @@ export class JobService {
           op.entity_id = jobId;
           op.operation = 'restore';
           op.changes = JSON.stringify({ archived: false });
-          op.client_version = (job._raw as any).client_version;
+          op.client_version = getJobClientVersion(job);
           op.retry_count = 0;
           op.max_retries = 3;
           op.status = 'local';

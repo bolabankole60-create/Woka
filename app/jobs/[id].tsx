@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from '@/db/database';
 import { JobService } from '@/services/jobService';
 import { useSyncAfterMutation } from '@/hooks/useSync';
+import { calculateOutstandingBalance } from '@/services/financialService';
 import type { Database } from '@nozbe/watermelondb';
 import * as SecureStore from 'expo-secure-store';
 
@@ -28,6 +29,9 @@ export default function JobDetailsScreen() {
   const [job, setJob] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [customer, setCustomer] = useState<any>(null);
+  const [invoice, setInvoice] = useState<any>(null);
+  const [payments, setPayments] = useState<any[]>([]);
   const syncAfterMutation = useSyncAfterMutation(db);
 
   useEffect(() => {
@@ -51,8 +55,38 @@ export default function JobDetailsScreen() {
         const service = new JobService(db, userId);
         const result = await service.getJob(id);
 
-        if (result.success) {
+        if (result.success && result.data) {
           setJob(result.data);
+
+          // Load customer if assigned
+          const raw = result.data._raw as any;
+          if (raw.customer_id) {
+            try {
+              const customersCollection = db.get('customers');
+              const cust = await customersCollection.find(raw.customer_id).catch(() => null);
+              setCustomer(cust);
+            } catch (error) {
+              console.error('Failed to load customer:', error);
+            }
+          }
+
+          // Load invoice if exists
+          try {
+            const invoicesCollection = db.get('invoices');
+            const invoices = await invoicesCollection.query().fetch().catch(() => []);
+            const inv = invoices.find((i: any) => i._raw?.job_id === raw.id) || null;
+            setInvoice(inv);
+
+            // Load payments if invoice exists
+            if (inv) {
+              const paymentsCollection = db.get('payments');
+              const pmts = await paymentsCollection.query().fetch().catch(() => []);
+              const filteredPayments = pmts.filter((p: any) => p._raw?.invoice_id === inv.id);
+              setPayments(filteredPayments);
+            }
+          } catch (error) {
+            console.error('Failed to load invoice/payments:', error);
+          }
         } else {
           Alert.alert('Error', result.error || 'Failed to load job');
         }
@@ -109,7 +143,7 @@ export default function JobDetailsScreen() {
     );
   }
 
-  const raw = job._raw as any;
+  const raw = job._raw;
   const syncStatus = raw.sync_status;
   const isLocal = syncStatus === 'local';
 
@@ -170,6 +204,80 @@ export default function JobDetailsScreen() {
         ) : null}
       </View>
 
+      {/* Customer Info */}
+      {customer ? (
+        <View style={{ backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 12, borderRadius: 8, padding: 16 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 }}>Customer</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>{(customer._raw as any).name}</Text>
+              <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{(customer._raw as any).phone}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push(`/customers/${customer.id}` as Href)}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f0f0f0', borderRadius: 4 }}
+            >
+              <Text style={{ fontSize: 12, color: '#4CAF50', fontWeight: '600' }}>View</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : raw.customer_id ? (
+        <View style={{ backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 12, borderRadius: 8, padding: 16 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 }}>Customer</Text>
+          <Text style={{ fontSize: 14, color: '#999' }}>Customer not available locally</Text>
+        </View>
+      ) : (
+        <View style={{ backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 12, borderRadius: 8, padding: 16 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 }}>Customer</Text>
+          <Text style={{ fontSize: 14, color: '#999' }}>No customer linked</Text>
+        </View>
+      )}
+
+      {/* Invoice & Payments */}
+      {invoice ? (() => {
+        const invoiceRaw = invoice._raw as any;
+        const outstanding = calculateOutstandingBalance({
+          invoiceTotal: invoiceRaw.total_amount,
+          invoiceAmountPaid: invoiceRaw.amount_paid,
+        });
+        return (
+          <View style={{ backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 12, borderRadius: 8, padding: 16 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 }}>Invoice</Text>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: '#999' }}>Invoice #</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>{invoiceRaw.invoice_number}</Text>
+            </View>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: '#999' }}>Total Amount</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#4CAF50' }}>₦{invoiceRaw.total_amount}</Text>
+            </View>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: '#999' }}>Amount Paid</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>₦{invoiceRaw.amount_paid}</Text>
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, color: '#999' }}>Outstanding Balance</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: outstanding > 0 ? '#ff9800' : '#4CAF50' }}>
+                ₦{outstanding.toFixed(2)}
+              </Text>
+            </View>
+            {payments.length > 0 && (
+              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 }}>Payments ({payments.length})</Text>
+                {payments.map((p: any) => (
+                  <View key={p.id} style={{ marginBottom: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: '#333' }}>₦{(p._raw as any).amount}</Text>
+                      <Text style={{ fontSize: 11, color: '#999' }}>{(p._raw as any).status}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })() : null}
+
       {/* Actions */}
       <View style={{ paddingHorizontal: 16, gap: 12 }}>
         <TouchableOpacity
@@ -205,6 +313,129 @@ export default function JobDetailsScreen() {
             <Text style={{ marginLeft: 8, color: '#fff', fontWeight: '600' }}>
               {isProcessing ? 'Processing...' : 'Mark Complete'}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {raw.status === 'COMPLETED' && (
+          <TouchableOpacity
+            onPress={async () => {
+              if (!job || !db || !userId) return;
+              try {
+                setIsProcessing(true);
+                const { JobService } = await import('@/services/jobService');
+                const service = new JobService(db, userId);
+                const result = await service.reopenJob(id!);
+                if (result.success) {
+                  Alert.alert('Success', 'Job reopened');
+                  setJob(result.data);
+                  const { useSyncAfterMutation } = await import('@/hooks/useSync');
+                  const syncAfterMutation = useSyncAfterMutation(db);
+                  await syncAfterMutation();
+                }
+              } catch (error) {
+                Alert.alert('Error', String(error));
+              } finally {
+                setIsProcessing(false);
+              }
+            }}
+            disabled={isProcessing}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              borderRadius: 6,
+              backgroundColor: isProcessing ? '#ccc' : '#FF9800',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+            <Text style={{ marginLeft: 8, color: '#fff', fontWeight: '600' }}>Reopen</Text>
+          </TouchableOpacity>
+        )}
+
+        {!raw.is_archived && (
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert(
+                'Archive Job',
+                'Are you sure you want to archive this job?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Archive',
+                    onPress: async () => {
+                      if (!job || !db || !userId) return;
+                      try {
+                        setIsProcessing(true);
+                        const { JobService } = await import('@/services/jobService');
+                        const service = new JobService(db, userId);
+                        const result = await service.archiveJob(id!);
+                        if (result.success) {
+                          Alert.alert('Success', 'Job archived');
+                          setJob(result.data);
+                          const { useSyncAfterMutation } = await import('@/hooks/useSync');
+                          const syncAfterMutation = useSyncAfterMutation(db);
+                          await syncAfterMutation();
+                        }
+                      } catch (error) {
+                        Alert.alert('Error', String(error));
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+            disabled={isProcessing}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              borderRadius: 6,
+              backgroundColor: isProcessing ? '#ccc' : '#9C27B0',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons name="archive" size={20} color="#fff" />
+            <Text style={{ marginLeft: 8, color: '#fff', fontWeight: '600' }}>Archive</Text>
+          </TouchableOpacity>
+        )}
+
+        {raw.is_archived && (
+          <TouchableOpacity
+            onPress={async () => {
+              if (!job || !db || !userId) return;
+              try {
+                setIsProcessing(true);
+                const { JobService } = await import('@/services/jobService');
+                const service = new JobService(db, userId);
+                const result = await service.restoreJob(id!);
+                if (result.success) {
+                  Alert.alert('Success', 'Job restored');
+                  setJob(result.data);
+                  const { useSyncAfterMutation } = await import('@/hooks/useSync');
+                  const syncAfterMutation = useSyncAfterMutation(db);
+                  await syncAfterMutation();
+                }
+              } catch (error) {
+                Alert.alert('Error', String(error));
+              } finally {
+                setIsProcessing(false);
+              }
+            }}
+            disabled={isProcessing}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              borderRadius: 6,
+              backgroundColor: isProcessing ? '#ccc' : '#2196F3',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons name="restore" size={20} color="#fff" />
+            <Text style={{ marginLeft: 8, color: '#fff', fontWeight: '600' }}>Restore</Text>
           </TouchableOpacity>
         )}
       </View>

@@ -34,6 +34,7 @@ export default function CustomerDetailsScreen() {
   const [db, setDb] = useState<Database | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [jobCounts, setJobCounts] = useState({ total: 0, active: 0, completed: 0, archived: 0 });
   const syncAfterMutation = useSyncAfterMutation(db);
 
   // Initialize database and user
@@ -51,6 +52,32 @@ export default function CustomerDetailsScreen() {
 
   // Load customer from WatermelonDB
   const customer = useCustomerById(db, id || null);
+
+  // Load job counts for this customer
+  useEffect(() => {
+    const loadJobCounts = async () => {
+      if (!db || !customer) return;
+
+      try {
+        const jobsCollection = db.get('jobs');
+        const allJobs = await jobsCollection.query().fetch();
+        const customerJobs = (allJobs as any[]).filter((j: any) => j._raw?.customer_id === customer.id);
+
+        const counts = {
+          total: customerJobs.length,
+          active: customerJobs.filter((j: any) => !j._raw.is_archived && j._raw.status !== 'COMPLETED').length,
+          completed: customerJobs.filter((j: any) => j._raw.status === 'COMPLETED').length,
+          archived: customerJobs.filter((j: any) => j._raw.is_archived).length,
+        };
+
+        setJobCounts(counts);
+      } catch (error) {
+        console.error('Failed to load job counts:', error);
+      }
+    };
+
+    loadJobCounts();
+  }, [db, customer?.id]);
 
   const handleArchive = async () => {
     if (!customer || !db || !userId) return;
@@ -149,6 +176,40 @@ export default function CustomerDetailsScreen() {
             <Text style={{ fontSize: 14, flex: 1 }}>{customer.address}</Text>
           </View>
         )}
+      </View>
+
+      {/* Job Stats */}
+      <View style={{ backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 12, borderRadius: 8, padding: 16 }}>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 12 }}>Jobs</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#4CAF50' }}>{jobCounts.total}</Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Total</Text>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#2196F3' }}>{jobCounts.active}</Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Active</Text>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#4CAF50' }}>{jobCounts.completed}</Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Completed</Text>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#999' }}>{jobCounts.archived}</Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Archived</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            router.push({
+              pathname: '/(tabs)/jobs',
+              params: { filteredCustomerId: customer.id },
+            } as any);
+          }}
+          style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f0f0f0', borderRadius: 6 }}
+        >
+          <Text style={{ textAlign: 'center', fontSize: 14, color: '#4CAF50', fontWeight: '600' }}>View All Jobs</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Actions */}

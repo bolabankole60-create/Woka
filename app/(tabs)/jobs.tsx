@@ -2,10 +2,10 @@
  * Jobs Screen
  *
  * Lists jobs from WatermelonDB using offline-first JobService.
- * Supports filtering, creation, and pull-to-refresh sync.
+ * Supports filtering, search, creation, and pull-to-refresh sync.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  TextInput,
+  ScrollView,
 } from 'react-native';
-import { useRouter, Href } from 'expo-router';
+import { useRouter, Href, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from '@/db/database';
 import { useManualSync } from '@/hooks/useSync';
+import { CustomerSelector } from '@/components/CustomerSelector';
 import type { Database } from '@nozbe/watermelondb';
 
 /**
@@ -26,10 +29,16 @@ import type { Database } from '@nozbe/watermelondb';
  */
 export default function JobsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ filteredCustomerId?: string }>();
   const [db, setDb] = useState<Database | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [customerFilter, setCustomerFilter] = useState<string | null>(params.filteredCustomerId || null);
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
+  const [archivedFilter, setArchivedFilter] = useState(false);
   const { isLoading: isSyncing, syncNow } = useManualSync(db);
 
   /**
@@ -45,37 +54,63 @@ export default function JobsScreen() {
   }, [db]);
 
   /**
-   * Load jobs from WatermelonDB
+   * Load jobs and customers from WatermelonDB
    */
   useEffect(() => {
-    const loadJobs = async () => {
+    const loadData = async () => {
       if (!db) return;
 
       try {
         setIsLoading(true);
         const jobsCollection = db.get('jobs');
+        const customersCollection = db.get('customers');
+
         const allJobs = await jobsCollection.query().fetch();
+        const allCustomers = await customersCollection.query().fetch();
 
-        // Filter by status if needed
-        const filtered = allJobs.filter((j: any) => {
-          const status = (j._raw as any).status;
-          if (selectedFilter === 'all') return true;
-          return status === selectedFilter;
-        });
-
-        setJobs(filtered);
+        setJobs(allJobs);
+        setCustomers(allCustomers);
       } catch (error) {
-        console.error('Failed to load jobs:', error);
+        console.error('Failed to load data:', error);
         Alert.alert('Error', 'Failed to load jobs');
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Reload jobs when filter changes or DB changes
-    const timeout = setTimeout(loadJobs, 300);
-    return () => clearTimeout(timeout);
-  }, [db, selectedFilter]);
+    loadData();
+  }, [db]);
+
+  /**
+   * Filter jobs based on search and filter criteria
+   */
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((j: any) => {
+      const raw = j._raw as any;
+
+      // Status filter
+      if (statusFilter !== 'all' && raw.status !== statusFilter) return false;
+
+      // Customer filter
+      if (customerFilter && raw.customer_id !== customerFilter) return false;
+
+      // Priority filter
+      if (priorityFilter && raw.priority !== priorityFilter) return false;
+
+      // Archived filter
+      if (raw.is_archived !== archivedFilter) return false;
+
+      // Search filter (title or description)
+      if (searchText) {
+        const search = searchText.toLowerCase();
+        const matchesTitle = raw.title?.toLowerCase().includes(search);
+        const matchesDesc = raw.description?.toLowerCase().includes(search);
+        if (!matchesTitle && !matchesDesc) return false;
+      }
+
+      return true;
+    });
+  }, [jobs, statusFilter, customerFilter, priorityFilter, archivedFilter, searchText]);
 
   const handleCreateJob = () => {
     router.push('/jobs/new' as Href);
@@ -85,10 +120,24 @@ export default function JobsScreen() {
     router.push(`/jobs/${jobId}` as Href);
   };
 
+  const getSyncStatusIcon = (syncStatus: string) => {
+    switch (syncStatus) {
+      case 'local':
+        return { icon: 'cloud-off-outline', color: '#ff9800', label: 'Local' };
+      case 'synced':
+        return { icon: 'cloud-check-outline', color: '#4CAF50', label: 'Synced' };
+      case 'failed':
+        return { icon: 'cloud-alert-outline', color: '#f44336', label: 'Failed' };
+      default:
+        return { icon: 'cloud-outline', color: '#999', label: 'Pending' };
+    }
+  };
+
   const renderJobItem = ({ item }: { item: any }) => {
     const raw = item._raw as any;
     const syncStatus = raw.sync_status;
-    const isLocal = syncStatus === 'local';
+    const syncInfo = getSyncStatusIcon(syncStatus);
+    const customerName = customers.find((c: any) => c.id === raw.customer_id)?._raw?.name;
 
     return (
       <TouchableOpacity
@@ -100,23 +149,34 @@ export default function JobsScreen() {
           marginVertical: 8,
           borderRadius: 8,
           borderLeftWidth: 4,
-          borderLeftColor: isLocal ? '#ff9800' : '#4CAF50',
+          borderLeftColor: raw.is_archived ? '#ccc' : (syncStatus === 'local' ? '#ff9800' : '#4CAF50'),
+          opacity: raw.is_archived ? 0.6 : 1,
         }}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', flex: 1 }}>{raw.title}</Text>
-          {isLocal && <MaterialCommunityIcons name="cloud-off-outline" size={16} color="#ff9800" />}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>{raw.title}</Text>
+            {customerName && <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>Customer: {customerName}</Text>}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <MaterialCommunityIcons name={syncInfo.icon as any} size={14} color={syncInfo.color} />
+            {raw.is_archived && <MaterialCommunityIcons name="archive-outline" size={14} color="#999" />}
+          </View>
         </View>
 
-        <Text style={{ color: '#666', fontSize: 14, marginBottom: 6 }}>{raw.location}</Text>
+        <Text style={{ color: '#666', fontSize: 13, marginBottom: 8 }}>{raw.location}</Text>
+        {raw.priority && <Text style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>Priority: {raw.priority}</Text>}
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 12, color: '#999' }}>Status: {raw.status}</Text>
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#4CAF50' }}>₦{raw.total_amount || 0}</Text>
+          <Text style={{ fontSize: 12, color: '#999' }}>{raw.status}</Text>
+          <Text style={{ fontSize: 11, color: syncInfo.color }}>{syncInfo.label}</Text>
         </View>
       </TouchableOpacity>
     );
   };
+
+  const hasActiveFilters =
+    statusFilter !== 'all' || customerFilter || priorityFilter || archivedFilter || searchText;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
@@ -145,25 +205,104 @@ export default function JobsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Search Bar */}
+        <TextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search by title or description..."
+          style={{
+            backgroundColor: '#f5f5f5',
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderRadius: 6,
+            marginBottom: 12,
+            fontSize: 14,
+          }}
+        />
+
         {/* Status Filter */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
           {['all', 'DRAFT', 'IN_PROGRESS', 'COMPLETED'].map((status) => (
             <TouchableOpacity
               key={status}
-              onPress={() => setSelectedFilter(status)}
+              onPress={() => setStatusFilter(status)}
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 borderRadius: 20,
-                backgroundColor: selectedFilter === status ? '#4CAF50' : '#e0e0e0',
+                backgroundColor: statusFilter === status ? '#4CAF50' : '#e0e0e0',
+                marginRight: 8,
               }}
             >
-              <Text style={{ fontSize: 12, color: selectedFilter === status ? '#fff' : '#666' }}>
+              <Text style={{ fontSize: 12, color: statusFilter === status ? '#fff' : '#666' }}>
                 {status === 'all' ? 'All' : status}
               </Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+
+        {/* Customer Filter using Selector */}
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4 }}>Filter by Customer</Text>
+          <CustomerSelector db={db} selectedCustomerId={customerFilter} onSelect={setCustomerFilter} placeholder="All Customers" />
         </View>
+
+        {/* Additional Filters */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+
+          {/* Priority Filter */}
+          <TouchableOpacity
+            onPress={() => setPriorityFilter(priorityFilter ? null : 'high')}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: priorityFilter ? '#FF9800' : '#e0e0e0',
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: priorityFilter ? '#fff' : '#666' }}>
+              {priorityFilter ? 'Priority: ' + priorityFilter : 'Priority'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Archived Filter */}
+          <TouchableOpacity
+            onPress={() => setArchivedFilter(!archivedFilter)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: archivedFilter ? '#9C27B0' : '#e0e0e0',
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: archivedFilter ? '#fff' : '#666' }}>
+              {archivedFilter ? 'Archived' : 'Active'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchText('');
+                setStatusFilter('all');
+                setCustomerFilter(null);
+                setPriorityFilter(null);
+                setArchivedFilter(false);
+              }}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                backgroundColor: '#f44336',
+              }}
+            >
+              <Text style={{ fontSize: 12, color: '#fff' }}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
       </View>
 
       {/* Content */}
@@ -171,20 +310,24 @@ export default function JobsScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#4CAF50" />
         </View>
-      ) : jobs.length === 0 ? (
+      ) : filteredJobs.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <MaterialCommunityIcons name="briefcase-outline" size={48} color="#ccc" />
-          <Text style={{ marginTop: 16, fontSize: 16, color: '#999' }}>No jobs yet</Text>
+          <Text style={{ marginTop: 16, fontSize: 16, color: '#999' }}>
+            {jobs.length === 0 ? 'No jobs yet' : 'No jobs match your filters'}
+          </Text>
           <TouchableOpacity
             onPress={handleCreateJob}
             style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 10 }}
           >
-            <Text style={{ color: '#4CAF50', fontSize: 16, fontWeight: '600' }}>Create Job</Text>
+            <Text style={{ color: '#4CAF50', fontSize: 16, fontWeight: '600' }}>
+              {jobs.length === 0 ? 'Create Job' : 'Clear Filters'}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={jobs}
+          data={filteredJobs}
           renderItem={renderJobItem}
           keyExtractor={(item) => (item._raw as any).id}
           refreshControl={<RefreshControl refreshing={isSyncing} onRefresh={syncNow} />}

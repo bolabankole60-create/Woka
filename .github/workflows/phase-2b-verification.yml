@@ -1,0 +1,99 @@
+name: Phase 2B Verification
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: tradify_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U test -d tradify_test && break
+            sleep 1
+          done
+
+      - name: Prisma Format Check
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx prisma format --check
+
+      - name: Prisma Validate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx prisma validate
+
+      - name: Prisma Generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx prisma generate
+
+      - name: Prisma Migrate Deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx prisma migrate deploy
+
+      - name: Prisma Migrate Status
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx prisma migrate status
+
+      - name: TypeScript Check (Mobile)
+        run: npx tsc --noEmit
+
+      - name: TypeScript Check (Backend)
+        run: npx tsc --noEmit -p tsconfig.backend.json
+
+      - name: Run Controller Integration Tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx jest src/controllers/__tests__/jobControllerIntegration.test.ts --runInBand
+
+      - name: Run Migration Tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx jest src/db/__tests__/migrationsExecutable.test.ts --runInBand
+
+      - name: Run Sync Integration Tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npx jest src/services/__tests__/syncIntegration.test.ts --runInBand
+
+      - name: Run Full Test Suite
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/tradify_test
+        run: npm test -- --runInBand
+
+      - name: Git Diff Check
+        run: git diff --check

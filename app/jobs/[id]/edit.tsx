@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from '@/db/database';
 import { JobService } from '@/services/jobService';
 import { useSyncAfterMutation } from '@/hooks/useSync';
+import { CustomerSelector } from '@/components/CustomerSelector';
 import type { Database } from '@nozbe/watermelondb';
 import * as SecureStore from 'expo-secure-store';
 
@@ -31,6 +32,7 @@ export default function EditJobScreen() {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('');
   const [notes, setNotes] = useState('');
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -64,6 +66,7 @@ export default function EditJobScreen() {
           setDescription(raw.description || '');
           setPriority(raw.priority || '');
           setNotes(raw.notes || '');
+          setCustomerId(raw.customer_id || null);
         } else {
           Alert.alert('Error', result.error || 'Failed to load job');
         }
@@ -98,6 +101,7 @@ export default function EditJobScreen() {
         description: description.trim(),
         priority: priority || undefined,
         notes: notes || undefined,
+        customerId: customerId || undefined,
       });
 
       if (!result.success) {
@@ -189,6 +193,10 @@ export default function EditJobScreen() {
         {errors.description && (
           <Text style={{ color: '#ff5252', fontSize: 12, marginBottom: 8 }}>{errors.description}</Text>
         )}
+
+        {/* Customer */}
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4 }}>Customer (Optional)</Text>
+        <CustomerSelector db={db} selectedCustomerId={customerId} onSelect={setCustomerId} />
 
         {/* Priority */}
         <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4 }}>Priority</Text>

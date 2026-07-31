@@ -80,6 +80,16 @@ export async function handleSync(req: Request, res: Response): Promise<void> {
   const { lastSyncedAt, pushChanges } = req.body as SyncRequest;
 
   try {
+    // Extract authenticated artisan ID from request
+    const artisanId = (req as any).artisanId;
+    if (!artisanId || typeof artisanId !== 'string') {
+      res.status(401).json({
+        success: false,
+        error: 'Not authenticated',
+      });
+      return;
+    }
+
     // Validate request
     if (!lastSyncedAt || typeof lastSyncedAt !== 'number') {
       res.status(400).json({
@@ -90,10 +100,10 @@ export async function handleSync(req: Request, res: Response): Promise<void> {
     }
 
     const lastSyncDate = new Date(lastSyncedAt);
-    logger.info(`[Sync] Starting sync. Last synced: ${lastSyncDate.toISOString()}`);
+    logger.info(`[Sync] Starting sync for artisan ${artisanId}. Last synced: ${lastSyncDate.toISOString()}`);
 
     // Process changes in a transaction
-    const results = await processPushChangesInTransaction(pushChanges);
+    const results = await processPushChangesInTransaction(pushChanges, artisanId);
 
     // Query for pull changes (records updated since lastSyncedAt)
     const pullChanges = await getPullChanges(lastSyncDate);
@@ -150,7 +160,8 @@ export async function handleSync(req: Request, res: Response): Promise<void> {
  * - Data consistency
  */
 async function processPushChangesInTransaction(
-  pushChanges: Record<string, SyncOperation[]> | undefined
+  pushChanges: Record<string, SyncOperation[]> | undefined,
+  artisanId: string
 ): Promise<SyncResult[]> {
   if (!pushChanges) {
     return [];
@@ -164,7 +175,7 @@ async function processPushChangesInTransaction(
       logger.debug(`[Sync] Processing ${operations.length} operations for ${collection}`);
 
       for (const op of operations) {
-        const result = await processOperation(tx, collection, op);
+        const result = await processOperation(tx, collection, op, artisanId);
         results.push(result);
       }
     }
@@ -184,7 +195,8 @@ async function processPushChangesInTransaction(
 async function processOperation(
   tx: any, // Transaction client
   collection: string,
-  op: SyncOperation
+  op: SyncOperation,
+  artisanId: string
 ): Promise<SyncResult> {
   const { id, operation, clientVersion, data } = op;
 
@@ -196,24 +208,69 @@ async function processOperation(
   };
 
   try {
+    // Validate operation ID is present
+    if (!id || typeof id !== 'string' || id.length === 0) {
+      return {
+        ...baseResult,
+        success: false,
+        error: 'Invalid operationId - must be non-empty string',
+      };
+    }
+
+    // Check if operation was already processed (idempotency)
+    const processed = await tx.processedOperation.findUnique({
+      where: {
+        operationId_artisanId: {
+          operationId: id,
+          artisanId,
+        },
+      },
+    });
+
+    if (processed) {
+      // Return cached result
+      return {
+        ...baseResult,
+        success: true,
+        serverVersion: processed.serverVersion,
+        serverData: processed.result,
+      };
+    }
+
+    let operationResult: SyncResult;
+
     switch (collection) {
       case 'users':
-        return await handleUserOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handleUserOperation(tx, operation, id, clientVersion, data, baseResult);
+        break;
 
       case 'jobs':
-        return await handleJobOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handleJobOperation(
+          tx,
+          operation,
+          id,
+          clientVersion,
+          data,
+          baseResult,
+          artisanId
+        );
+        break;
 
       case 'invoices':
-        return await handleInvoiceOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handleInvoiceOperation(tx, operation, id, clientVersion, data, baseResult);
+        break;
 
       case 'payments':
-        return await handlePaymentOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handlePaymentOperation(tx, operation, id, clientVersion, data, baseResult);
+        break;
 
       case 'expenseLogs':
-        return await handleExpenseOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handleExpenseOperation(tx, operation, id, clientVersion, data, baseResult);
+        break;
 
       case 'customers':
-        return await handleCustomerOperation(tx, operation, id, clientVersion, data, baseResult);
+        operationResult = await handleCustomerOperation(tx, operation, id, clientVersion, data, baseResult);
+        break;
 
       default:
         return {
@@ -222,6 +279,23 @@ async function processOperation(
           error: `Unknown collection: ${collection}`,
         };
     }
+
+    // Save processed operation for idempotency
+    if (operationResult.success && collection === 'jobs') {
+      await tx.processedOperation.create({
+        data: {
+          operationId: id,
+          artisanId,
+          entityType: collection,
+          entityId: data.id || '',
+          operation,
+          serverVersion: operationResult.serverVersion || 0,
+          result: operationResult.serverData || null,
+        },
+      });
+    }
+
+    return operationResult;
   } catch (error) {
     logger.error(`[Sync] Error processing ${collection}/${id}:`, error);
     return {
@@ -327,7 +401,7 @@ async function handleUserOperation(
 }
 
 /**
- * Handle job operations
+ * Handle job operations with ownership verification
  */
 async function handleJobOperation(
   tx: any,
@@ -335,26 +409,68 @@ async function handleJobOperation(
   id: string,
   clientVersion: number,
   data: Record<string, any>,
-  baseResult: SyncResult
+  baseResult: SyncResult,
+  artisanId: string
 ): Promise<SyncResult> {
   if (operation === 'create') {
+    // Force artisan ID from authentication, ignore payload
+    const jobData: any = {
+      ...data,
+      artisanId,
+      serverVersion: 1,
+    };
+
+    // Verify customer belongs to same artisan if provided
+    if (jobData.customerId && typeof jobData.customerId === 'string') {
+      const customer = await tx.customer.findUnique({
+        where: { id: jobData.customerId },
+      });
+      if (!customer || customer.artisanId !== artisanId) {
+        return {
+          ...baseResult,
+          success: false,
+          error: 'Customer does not belong to authenticated artisan',
+        };
+      }
+    }
+
     await tx.job.create({
-      data: {
-        id,
-        ...data,
-        serverVersion: 1,
-      },
+      data: jobData,
     });
     return { ...baseResult, serverVersion: 1 };
   }
 
-  if (operation === 'update') {
-    const existing = await tx.job.findUnique({ where: { id } });
+  // For all other operations, verify ownership first
+  const existing = await tx.job.findUnique({ where: { id } });
 
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
+  if (!existing) {
+    return { ...baseResult, success: false, error: 'Job not found' };
+  }
+
+  // Enforce ownership
+  if (existing.artisanId !== artisanId) {
+    return {
+      ...baseResult,
+      success: false,
+      error: 'Job does not belong to authenticated artisan',
+    };
+  }
+
+  // Verify customer ownership if customerId in data
+  if (data.customerId && data.customerId !== existing.customerId) {
+    const customer = await tx.customer.findUnique({
+      where: { id: data.customerId },
+    });
+    if (!customer || customer.artisanId !== artisanId) {
+      return {
+        ...baseResult,
+        success: false,
+        error: 'Customer does not belong to authenticated artisan',
+      };
     }
+  }
 
+  if (operation === 'update') {
     if (clientVersion < existing.serverVersion) {
       return {
         ...baseResult,
@@ -377,12 +493,6 @@ async function handleJobOperation(
   }
 
   if (operation === 'delete') {
-    const existing = await tx.job.findUnique({ where: { id } });
-
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
-    }
-
     await tx.job.update({
       where: { id },
       data: {
@@ -396,12 +506,6 @@ async function handleJobOperation(
   }
 
   if (operation === 'complete') {
-    const existing = await tx.job.findUnique({ where: { id } });
-
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
-    }
-
     const updated = await tx.job.update({
       where: { id },
       data: {
@@ -416,12 +520,6 @@ async function handleJobOperation(
   }
 
   if (operation === 'reopen') {
-    const existing = await tx.job.findUnique({ where: { id } });
-
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
-    }
-
     const updated = await tx.job.update({
       where: { id },
       data: {
@@ -436,12 +534,6 @@ async function handleJobOperation(
   }
 
   if (operation === 'archive') {
-    const existing = await tx.job.findUnique({ where: { id } });
-
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
-    }
-
     const updated = await tx.job.update({
       where: { id },
       data: {
@@ -455,12 +547,6 @@ async function handleJobOperation(
   }
 
   if (operation === 'restore') {
-    const existing = await tx.job.findUnique({ where: { id } });
-
-    if (!existing) {
-      return { ...baseResult, success: false, error: 'Job not found' };
-    }
-
     const updated = await tx.job.update({
       where: { id },
       data: {

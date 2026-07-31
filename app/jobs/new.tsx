@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from '@/db/database';
 import { JobService } from '@/services/jobService';
 import { useSyncAfterMutation } from '@/hooks/useSync';
+import { CustomerSelector } from '@/components/CustomerSelector';
 import type { Database } from '@nozbe/watermelondb';
 import * as SecureStore from 'expo-secure-store';
 
@@ -31,6 +32,7 @@ export default function NewJobScreen() {
   const [location, setLocation] = useState('');
   const [priority, setPriority] = useState('');
   const [estimatedCost, setEstimatedCost] = useState('');
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const syncAfterMutation = useSyncAfterMutation(db);
@@ -66,6 +68,7 @@ export default function NewJobScreen() {
 
       const result = await service.createJob({
         clientId: userId,
+        customerId: customerId || undefined,
         title: title.trim(),
         description: description.trim(),
         category: category.trim(),
@@ -204,6 +207,12 @@ export default function NewJobScreen() {
           }}
         />
         {errors.location && <Text style={{ color: '#ff5252', fontSize: 12, marginBottom: 8 }}>{errors.location}</Text>}
+
+        {/* Customer */}
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4 }}>
+          Customer (Optional)
+        </Text>
+        <CustomerSelector db={db} selectedCustomerId={customerId} onSelect={setCustomerId} />
 
         {/* Priority */}
         <Text style={{ fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4 }}>
