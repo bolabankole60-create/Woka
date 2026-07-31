@@ -30,7 +30,6 @@ describeIfDB('Job Controller Integration Tests', () => {
   const artisan1Id = 'artisan-1';
   const artisan2Id = 'artisan-2';
   const clientId = 'client-1';
-  const userId = 'user-1';
 
   const token1 = `artisan:${artisan1Id}`;
   const token2 = `artisan:${artisan2Id}`;
