@@ -59,6 +59,14 @@ describeIfDB('Job Controller Integration Tests', () => {
       try {
         await prisma.job.deleteMany({});
         await prisma.customer.deleteMany({});
+        await prisma.user.deleteMany({});
+        // Create test users
+        await prisma.user.create({
+          data: { id: artisan1Id, email: 'artisan1@test.com', role: 'ARTISAN' },
+        });
+        await prisma.user.create({
+          data: { id: artisan2Id, email: 'artisan2@test.com', role: 'ARTISAN' },
+        });
       } catch {
         // Skip cleanup if database not available
       }
@@ -70,6 +78,7 @@ describeIfDB('Job Controller Integration Tests', () => {
       try {
         await prisma.job.deleteMany({});
         await prisma.customer.deleteMany({});
+        await prisma.user.deleteMany({});
         await prisma.$disconnect();
       } catch {
         // Skip cleanup if database not available
