@@ -30,6 +30,7 @@ describeIfDB('Job Controller Integration Tests', () => {
   const artisan1Id = 'artisan-1';
   const artisan2Id = 'artisan-2';
   const clientId = 'client-1';
+  const userId = 'user-1';
 
   const token1 = `artisan:${artisan1Id}`;
   const token2 = `artisan:${artisan2Id}`;
@@ -87,6 +88,21 @@ describeIfDB('Job Controller Integration Tests', () => {
             city: 'Lagos',
             passwordHash: 'test_hash_2',
             passwordSalt: 'test_salt_2',
+          },
+        });
+        // Create client user for job clientId foreign key
+        await prisma.user.create({
+          data: {
+            id: clientId,
+            email: 'client@test.com',
+            role: 'CLIENT',
+            phone: '08033333333',
+            firstName: 'Client',
+            lastName: 'User',
+            state: 'Lagos',
+            city: 'Lagos',
+            passwordHash: 'test_hash_client',
+            passwordSalt: 'test_salt_client',
           },
         });
       } catch {
