@@ -69,6 +69,10 @@ describeIfDB('Job Controller Integration Tests', () => {
             phone: '08011111111',
             firstName: 'Artisan',
             lastName: 'One',
+            state: 'Lagos',
+            city: 'Lagos',
+            passwordHash: 'test_hash_1',
+            passwordSalt: 'test_salt_1',
           },
         });
         await prisma.user.create({
@@ -79,6 +83,10 @@ describeIfDB('Job Controller Integration Tests', () => {
             phone: '08022222222',
             firstName: 'Artisan',
             lastName: 'Two',
+            state: 'Lagos',
+            city: 'Lagos',
+            passwordHash: 'test_hash_2',
+            passwordSalt: 'test_salt_2',
           },
         });
       } catch {
